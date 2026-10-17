@@ -422,6 +422,9 @@ struct Project::Impl {
     Log* log = nullptr;
     std::unique_ptr<Component> root;
     HardwareParse hw;
+    OsSettings settings;
+    bool has_settings = false;
+    DocumentManager* docs = nullptr;
     bool synced = false;
     uint64_t synced_version = 0;
 
@@ -619,6 +622,12 @@ std::unique_ptr<Project> Project::open(const fs::path& location, const fs::path&
     m.engine_root = canon(root);
     m.doc = doc;
     m.log = &log;
+    m.docs = &docs;
+    if (fs::is_regular_file(m.directory / kSettingsFile, ec)) {
+        std::string settings_error;
+        if (load_settings(m.directory / kSettingsFile, m.settings, &settings_error)) m.has_settings = true;
+        else log.warn("Cannot read " + std::string(kSettingsFile) + ": " + settings_error);
+    }
     m.dir_name = m.directory.filename().string();
     if (m.dir_name.empty()) m.dir_name = "OSEF";
     m.name = m.dir_name;
@@ -649,6 +658,26 @@ std::unique_ptr<Project> Project::open(const fs::path& location, const fs::path&
         for (const std::string& problem : m.hw.problems) log.warn(m.main_title() + ": " + problem);
     }
     return p;
+}
+
+OsSettings& Project::settings() { return impl_->settings; }
+bool Project::uses_settings() const { return impl_->has_settings; }
+std::vector<std::string> Project::settings_problems() const { return validate_settings(impl_->settings); }
+
+bool Project::settings_changed(std::string* error) {
+    Impl& m = *impl_;
+    std::string err;
+    if (!write_settings_files(m.directory, m.settings, &err)) {
+        if (m.log) m.log->error("Cannot save the OS settings: " + err);
+        if (error) *error = err;
+        return false;
+    }
+    m.has_settings = true;
+    // Keep an open copy of the generated file in sync (it is rewritten on disk).
+    if (m.docs)
+        if (Document* gen = m.docs->find(m.directory / kGeneratedFile))
+            if (!gen->modified()) gen->reload(nullptr);
+    return true;
 }
 
 const std::string& Project::name() const { return impl_->name; }

@@ -4,6 +4,7 @@
 
 #include "model/component.h"
 #include "model/hardware_decl.h"
+#include "model/os_settings.h"
 
 #include <filesystem>
 #include <memory>
@@ -59,6 +60,14 @@ public:
     void apply_property(Component& component, const Property& property);
     void apply_enabled(Component& component);
     void add_hardware_declaration();                   // inserts a default one if missing
+
+    // Plain-language settings from <project>/osef-settings.ini (defaults when
+    // the file does not exist yet). Edit settings(), then call settings_changed()
+    // to write osef-settings.ini and the generated osef_generated.cpp.
+    OsSettings& settings();
+    bool settings_changed(std::string* error = nullptr);
+    std::vector<std::string> settings_problems() const;   // validate_settings()
+    bool uses_settings() const;                          // osef-settings.ini exists
 
     std::filesystem::path resolve(const SourceRef& ref) const;   // absolute path
     std::vector<BuildTarget> build_targets() const;
