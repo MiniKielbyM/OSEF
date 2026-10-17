@@ -118,6 +118,32 @@ const Vector<Builtin>& builtins() {
                            static_cast<unsigned>(t.second));
              return 0;
          }},
+        {"irq", "list custom interrupt handlers", [](Context& c, const Args&, String& out) {
+             const Vector<InterruptInfo> list = c.kernel().interrupts().list();
+             if (list.empty()) {
+                 out += "no custom interrupt handlers (kernel.interrupts().on_irq / on_vector)\n";
+                 return 0;
+             }
+             out += "VECTOR  SOURCE   COUNT  NAME\n";
+             for (const InterruptInfo& i : list)
+                 out += format("  0x%02x  %-6s %7llu  %s\n", unsigned(i.vector),
+                               i.irq ? format("IRQ %u", unsigned(i.vector - Interrupts::kFirstIrqVector)).c_str()
+                                     : "soft",
+                               static_cast<unsigned long long>(i.count), i.name.c_str());
+             return 0;
+         }},
+        {"int", "int <vector>  raise a software interrupt (0x30-0xff)", [](Context& c, const Args& a, String& out) {
+             long long v = -1;
+             if (a.size() != 1 || !parse_int(a[0], v) || v < 0 || v > 255) {
+                 out += "usage: int <vector>   (48-255, decimal or 0x hex)\n";
+                 return 1;
+             }
+             if (!c.kernel().interrupts().raise(static_cast<uint8_t>(v))) {
+                 out += format("int: vector 0x%02x is reserved (0-31 CPU exceptions, 32-47 IRQ lines)\n", unsigned(v));
+                 return 1;
+             }
+             return 0;
+         }},
         {"lspci", "list PCI devices (bare metal; enable osef::Hw::PCI)", [](Context& c, const Args&, String& out) {
              Vector<PciDevice> devices;
              if (!c.kernel().platform().pci_devices(devices)) {

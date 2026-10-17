@@ -8,6 +8,7 @@
 #include <osef/core.h>
 #include <osef/hardware.h>
 
+#include <osef/interrupts.h>
 #include <osef/ipc.h>
 #include <osef/kernel.h>
 #include <osef/module.h>

@@ -57,6 +57,17 @@ uintptr_t rsdp_address();
 void* map_physical(uint64_t phys, uint64_t size, bool uncached);
 void* map_mmio(uint64_t phys, uint64_t size);  // uncached (device registers)
 
+// ---- custom interrupts ----
+// Vectors 0-31: CPU exceptions (reserved). 32-47: legacy IRQ lines 0-15
+// (IRQ n = vector 32 + n; the engine's own IRQ 0/1/4 handlers still run).
+// 48-255: free for the OS. A claimed vector is counted on every interrupt;
+// `handler` (optional) runs immediately in interrupt context: keep it tiny.
+using InterruptHandler = void (*)(uint8_t vector, void* user);
+bool claim_interrupt(uint8_t vector, InterruptHandler handler = nullptr, void* user = nullptr);
+void release_interrupt(uint8_t vector);
+uint32_t take_interrupts(uint8_t vector);  // count since the last call (and resets it)
+bool raise_interrupt(uint8_t vector);      // software interrupt (int $vector), vectors 48-255
+
 // Milliseconds since the PIT was started (1000 Hz, IRQ0).
 uint64_t ticks_ms();
 

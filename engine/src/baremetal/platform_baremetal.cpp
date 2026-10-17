@@ -45,6 +45,11 @@ public:
     void write(StringView text) override { bm::console_write(text.data(), text.size()); }
     void set_console_colors(int fg, int bg) override { bm::console_set_colors(fg, bg); }
     void set_console_scale(int scale) override { bm::console_set_scale(scale); }
+    bool hardware_interrupts() const override { return true; }
+    bool claim_interrupt(uint8_t vector) override { return bm::claim_interrupt(vector); }
+    void release_interrupt(uint8_t vector) override { bm::release_interrupt(vector); }
+    uint32_t take_interrupts(uint8_t vector) override { return bm::take_interrupts(vector); }
+    bool raise_interrupt(uint8_t vector) override { return bm::raise_interrupt(vector); }
 
     bool poll_line(String& out) override {
         char c;

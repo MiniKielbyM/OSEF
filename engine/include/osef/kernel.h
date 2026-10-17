@@ -4,6 +4,7 @@
 
 #include <osef/core.h>
 #include <osef/hardware.h>
+#include <osef/interrupts.h>
 #include <osef/ipc.h>
 #include <osef/module.h>
 #include <osef/platform.h>
@@ -154,6 +155,7 @@ public:
     Platform& platform() { return *platform_; }
     VFS& vfs() { return vfs_; }
     IPC& ipc() { return ipc_; }
+    Interrupts& interrupts() { return interrupts_; }
     SyscallTable& syscalls() { return syscalls_; }
     ProgramRegistry& programs() { return programs_; }
 
@@ -203,6 +205,7 @@ private:
     SharedPtr<DevFS> devfs_;
     VFS vfs_;
     IPC ipc_;
+    Interrupts interrupts_{*this};
     SyscallTable syscalls_;
     ProgramRegistry programs_;
     Vector<UniquePtr<Module>> modules_;

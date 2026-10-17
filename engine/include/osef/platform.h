@@ -87,6 +87,19 @@ public:
     virtual bool read_wall_clock(WallClock&) { return false; }
     virtual bool pci_devices(Vector<PciDevice>&) { return false; }
 
+    // ---- Interrupts ----
+    // Vectors 0-31 are CPU exceptions (reserved), 32-47 the legacy IRQ lines
+    // 0-15 (vector = 32 + irq), 48-255 are free for the OS. claim_interrupt()
+    // routes a vector to the kernel; take_interrupts() returns how many
+    // arrived since the last call. The defaults simulate software interrupts
+    // (raise_interrupt), so hosted builds and tests behave like bare metal;
+    // only bare metal has real hardware IRQ lines.
+    virtual bool hardware_interrupts() const { return false; }
+    virtual bool claim_interrupt(uint8_t vector);
+    virtual void release_interrupt(uint8_t vector);
+    virtual uint32_t take_interrupts(uint8_t vector);
+    virtual bool raise_interrupt(uint8_t vector);
+
     // Memory usage; total == 0 means the platform does not report it.
     virtual MemoryStats memory() const { return {}; }
 
@@ -99,6 +112,10 @@ public:
     // inside run_protected. The default implementation prints the message
     // and stops the machine (osef::assert_fail).
     [[noreturn]] virtual void fault(StringView message);
+
+private:
+    bool claimed_[256] = {};
+    uint32_t pending_[256] = {};
 };
 
 #if OSEF_HAS_EXCEPTIONS

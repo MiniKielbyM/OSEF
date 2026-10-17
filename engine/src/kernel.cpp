@@ -366,6 +366,7 @@ bool Kernel::tick() {
         while (platform_->poll_line(line)) input_.push_back(osef::move(line));
 
         wake_processes();
+        interrupts_.poll();
         for (size_t i = 0; i < modules_.size() && running_; ++i) modules_[i]->on_tick(*this);
 
         for (uint32_t q = 0; q < config_.quanta_per_tick && running_; ++q) {
@@ -374,6 +375,7 @@ bool Kernel::tick() {
                 if (p->info_.state == ProcState::Ready) ready_.push_back(p.get());
             if (ready_.empty()) break;
             run_quantum(*scheduler_->pick(ready_));
+            interrupts_.poll();  // software interrupts raised by that step
         }
         reap();
         ++ticks_;

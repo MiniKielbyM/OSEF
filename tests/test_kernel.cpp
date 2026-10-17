@@ -469,11 +469,48 @@ static void test_auto_module() {
     CHECK(found);
 }
 
+
+// Custom interrupts: soft vectors are counted, delivered on the next tick,
+// isolated when they fault, and listed by the `irq` builtin.
+static void test_interrupts() {
+    Harness h({"int 0x80", "int 0x80", "int 20", "int 0x81", "irq", "exit"});
+    h.kernel->add_module<ShellModule>();
+    Interrupts& irq = h.kernel->interrupts();
+    uint32_t seen = 0;
+    int calls = 0;
+    CHECK(irq.on_vector(0x80, "test-call", [&](Kernel& k, uint8_t v, uint32_t n) {
+        CHECK(v == 0x80);
+        seen += n;
+        ++calls;
+        k.print("handled 0x80\n");
+    }));
+    CHECK(irq.on_vector(0x81, "boom", [](Kernel&, uint8_t, uint32_t) { throw std::runtime_error("bad handler"); }));
+    CHECK(!irq.on_vector(20, "exception", [](Kernel&, uint8_t, uint32_t) {}));  // CPU exception vectors reserved
+    CHECK(!irq.on_vector(40, "irq-range", [](Kernel&, uint8_t, uint32_t) {}));  // IRQ lines use on_irq
+    CHECK(irq.on_irq(12, "mouse", [](Kernel&, uint8_t, uint32_t) {}));
+    CHECK(!irq.on_irq(16, "bad", [](Kernel&, uint8_t, uint32_t) {}));
+    CHECK(!irq.raise(0x2c));     // IRQ vectors cannot be raised in software
+    CHECK(!irq.hardware());      // hosted/test platform: simulated
+    CHECK(h.run() >= 0);
+    CHECK(seen == 2);
+    CHECK(calls >= 1);
+    CHECK(irq.count(0x80) == 2);
+    CHECK(h.has("handled 0x80"));
+    CHECK(h.has("int: vector 0x14 is reserved"));
+    CHECK(h.has("interrupt 0x81 (boom) handler crashed: bad handler"));
+    CHECK(h.has("  0x80  soft         2  test-call"));
+    CHECK(h.has("  0x2c  IRQ 12       0  mouse"));
+    CHECK(irq.remove(0x80));
+    CHECK(!irq.remove(0x80));
+    CHECK(irq.list().size() == 2);
+}
+
 int main() {
     struct {
         const char* name;
         void (*fn)();
     } tests[] = {
+        {"interrupts", test_interrupts},
         {"appearance", test_appearance},
         {"default_appearance", test_default_appearance},
         {"on_configure", test_on_configure},
