@@ -22,6 +22,8 @@
 #include <system_error>
 #include <unordered_map>
 #include <vector>
+#include <cctype>
+#include <cstdint>
 
 namespace fs = std::filesystem;
 

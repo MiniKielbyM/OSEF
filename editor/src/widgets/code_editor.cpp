@@ -20,6 +20,7 @@
 #include <cstdio>
 #include <string_view>
 #include <vector>
+#include <utility>
 
 namespace osef::editor {
 

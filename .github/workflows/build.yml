@@ -127,16 +127,28 @@ jobs:
               libxcursor-dev libxi-dev libgl-dev libwayland-dev libxkbcommon-dev wayland-protocols
 
       - name: Build and test (CMake; fetches ImGui, GLFW and fonts)
+        shell: bash
         run: |
-          cmake -S editor -B build-editor -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-editor --config Release --parallel
-          ctest --test-dir build-editor -C Release --output-on-failure
+          set -o pipefail
+          cmake -S editor -B build-editor -DCMAKE_BUILD_TYPE=Release 2>&1 | tee editor-build.log
+          cmake --build build-editor --config Release --parallel 2>&1 | tee -a editor-build.log
+          ctest --test-dir build-editor -C Release --output-on-failure 2>&1 | tee -a editor-build.log
+
+      # Job logs need repository admin rights; annotations are public. Turn the
+      # first compiler/test errors into annotations so failures are readable.
+      - name: Report errors
+        if: failure()
+        shell: bash
+        run: |
+          grep -E "error|Error|FAIL|undefined reference|fatal" editor-build.log | grep -v "Werror\|error_code\|_error\b" \
+              | head -20 | while IFS= read -r line; do echo "::error::${line//%/%25}"; done
+          exit 0
 
       - name: Package (macOS app bundle)
         if: runner.os == 'macOS'
         run: |
-          make -C editor app
-          ditto -c -k --keepParent "build/editor/OSEF Editor.app" OSEF-Editor-macOS.zip
+          make -C editor app 2>&1 | tee package.log || { grep -E "error|Error|No such" package.log | head -10 | sed 's/^/::error::/'; exit 1; }
+          ditto -c -k --keepParent "build/editor/OSEF.app" OSEF-Editor-macOS.zip
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
@@ -208,7 +220,7 @@ jobs:
             Automatic release of `${{ github.sha }}`: every hosted, bare-metal (BIOS + UEFI boot tests in QEMU)
             and editor test passed.
 
-            * **OSEF-Editor-macOS.zip**: unzip and drag *OSEF Editor.app* into Applications. It is ad-hoc
+            * **OSEF-Editor-macOS.zip**: unzip and drag *OSEF.app* into Applications. It is ad-hoc
               signed, not notarized: right-click > Open the first time.
             * **OSEF-Editor-Linux-x86_64.tar.gz** / **OSEF-Editor-Windows-x86_64.zip** (experimental): the
               editor with its fonts.

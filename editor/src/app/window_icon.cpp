@@ -9,6 +9,7 @@
 #include <vector>
 #include <cmath>
 #include <cstdint>
+#include <utility>
 
 #if defined(__APPLE__)
 extern "C" void osef_editor_set_macos_app_icon(const unsigned char* pixels, int width, int height);

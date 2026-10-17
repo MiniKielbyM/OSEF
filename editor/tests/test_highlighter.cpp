@@ -10,6 +10,8 @@
 #include <iterator>
 #include <string>
 #include <vector>
+#include <string_view>
+#include <cstdint>
 
 using namespace osef::editor;
 

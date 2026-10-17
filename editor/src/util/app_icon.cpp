@@ -6,6 +6,7 @@
 #include <fstream>
 #include <system_error>
 #include <vector>
+#include <cstdint>
 
 namespace osef::editor {
 

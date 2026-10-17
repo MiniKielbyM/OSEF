@@ -1,6 +1,7 @@
 #include "model/cpp_tokens.h"
 
 #include <cstdint>
+#include <utility>
 
 namespace osef::editor::cpp {
 
@@ -389,8 +390,8 @@ ActiveCode active_code(std::string_view source, const Tokens& toks) {
         if (i == 0) {
             // Only whitespace (or comments) before the first token.
             size_t c = 0;
-            return !line_break_between(source, toks.comments, c, 0, 0) &&
-                   source.substr(0, t[0].begin).find_first_not_of(" \t\r\n\f\v") == std::string_view::npos ||
+            return (!line_break_between(source, toks.comments, c, 0, 0) &&
+                    source.substr(0, t[0].begin).find_first_not_of(" \t\r\n\f\v") == std::string_view::npos) ||
                    source.substr(0, t[0].begin).find_first_not_of(" \t\r\n\f\v") != std::string_view::npos;
         }
         size_t c = ci;

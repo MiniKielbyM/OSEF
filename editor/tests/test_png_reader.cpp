@@ -10,6 +10,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <vector>
+#include <cstdint>
 
 using namespace osef::editor;
 namespace fs = std::filesystem;

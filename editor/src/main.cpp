@@ -41,6 +41,8 @@
 #include <mach-o/dyld.h>
 #elif defined(_WIN32)
 #include <windows.h>
+#include <utility>
+#include <string_view>
 #endif
 
 #ifndef OSEF_EDITOR_FONTS_DIR

@@ -18,6 +18,7 @@
 #include <string>
 #include <system_error>
 #include <vector>
+#include <utility>
 
 namespace osef::editor {
 namespace fs = std::filesystem;

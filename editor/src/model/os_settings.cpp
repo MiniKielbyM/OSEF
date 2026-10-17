@@ -8,6 +8,8 @@
 #include <set>
 #include <sstream>
 #include <system_error>
+#include <utility>
+#include <cstdint>
 
 namespace osef::editor {
 

@@ -10,6 +10,7 @@
 #include <fstream>
 #include <limits>
 #include <system_error>
+#include <utility>
 
 namespace osef::editor {
 

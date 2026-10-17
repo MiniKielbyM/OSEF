@@ -155,7 +155,7 @@ Makefile and boots them in QEMU. It also builds the WebAssembly target
 
 **Releases:** every push to `main` that passes all of these jobs publishes a
 GitHub release (`v<version>-build.<run>`). It contains the editor for macOS
-(`OSEF Editor.app`, zipped), Linux and Windows (experimental), plus the example
+(`OSEF.app`, zipped), Linux and Windows (experimental), plus the example
 ISOs. A downloaded editor finds the OSEF folder through `--root`, the
 `OSEF_ROOT` environment variable, or a checkout at `~/OSEF` or `~/Documents/OSEF`.
 
@@ -186,7 +186,7 @@ ISOs from the app you need the ISO tools as well. Steps for each system:
 4. Optional: make it a regular Mac app you can open from Launchpad, Spotlight
    or the Dock:
    ```sh
-   make -C editor app                 # -> build/editor/OSEF Editor.app (drag it into Applications)
+   make -C editor app                 # -> build/editor/OSEF.app (drag it into Applications)
    make -C editor install             # or copy it there: /Applications, else ~/Applications
    make -C editor uninstall           # remove it again
    ```

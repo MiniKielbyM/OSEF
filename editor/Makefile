@@ -124,7 +124,7 @@ ALL_OBJS := $(EDITOR_OBJS) $(EDITOR_NATIVE_OBJS) $(IMGUI_OBJS) $(GLFW_OBJS) $(TE
 
 # ---- Targets -------------------------------------------------------------------
 
-.PHONY: all run test deps clean app install uninstall
+.PHONY: all run test deps clean app install uninstall icons
 .DEFAULT_GOAL := all
 
 all: deps $(BIN)
@@ -155,22 +155,37 @@ clean:
 	rm -rf $(BUILD)
 
 # ---- macOS app bundle -----------------------------------------------------------
-#   make -C editor app        build/editor/OSEF Editor.app (double-click it, or drag it to Applications)
+#   make -C editor app        build/editor/OSEF.app (double-click it, or drag it to Applications)
 #   make -C editor install    copy it to /Applications (or ~/Applications if that isn't writable)
 #   make -C editor uninstall  remove the installed copy
 # The bundle keeps using this OSEF folder (compiled in) for the engine and the
 # example projects, so build it from where the OSEF checkout will stay.
 APP_VERSION ?= 1.0.0
-APP         := $(BUILD)/OSEF.app
+APP_NAME    := OSEF.app
+APP         := $(BUILD)/$(APP_NAME)
 APP_STAMP   := $(BUILD)/.app-stamp
 ICONSET     := $(BUILD)/OSEF.iconset
 ICNS        := $(BUILD)/OSEF.icns
 INSTALL_DIR ?= $(shell if [ -w /Applications ]; then echo /Applications; else echo "$$HOME/Applications"; fi)
 
 ifeq ($(UNAME_S),Darwin)
-$(ICNS): $(BIN)
+# App icon: editor/assets/icon.png is the single source for every platform.
+# `make -C editor icons` regenerates the derived files (committed, so other
+# systems need no image tools): assets/icon.ico (Windows), assets/OSEF.icns
+# (macOS) and src/app/icon_data.inc (window/Dock icon at runtime).
+ICON_PNG := $(EDITOR_DIR)/assets/icon.png
+$(ICNS): $(EDITOR_DIR)/assets/OSEF.icns
 	@echo "  ICON  $@"
-	$(Q)rm -rf "$(ICONSET)" && $(BIN) --write-iconset "$(ICONSET)" && iconutil -c icns "$(ICONSET)" -o "$@"
+	$(Q)cp "$<" "$@"
+
+icons: all
+	@echo "  ICONS from $(ICON_PNG)"
+	$(Q)rm -rf "$(EDITOR_DIR)/assets/OSEF.iconset"
+	$(Q)$(BIN) --make-icons "$(ICON_PNG)" "$(EDITOR_DIR)/assets" "$(SRC_DIR)/app/icon_data.inc"
+	$(Q)iconutil -c icns "$(EDITOR_DIR)/assets/OSEF.iconset" -o "$(EDITOR_DIR)/assets/OSEF.icns"
+	$(Q)rm -rf "$(EDITOR_DIR)/assets/OSEF.iconset"
+	$(Q)$(MAKE) --no-print-directory -f "$(EDITOR_DIR)/Makefile" all
+	@echo "Updated assets/icon.ico, assets/OSEF.icns and src/app/icon_data.inc; rebuild the app with: make -C editor app"
 
 app: all $(ICNS) $(EDITOR_DIR)/macos/Info.plist.in
 	@echo "  APP   $(APP)"
@@ -187,15 +202,22 @@ app: all $(ICNS) $(EDITOR_DIR)/macos/Info.plist.in
 
 install: app
 	@mkdir -p "$(INSTALL_DIR)"
-	@rm -rf "$(INSTALL_DIR)/OSEF Editor.app"
-	@ditto "$(APP)" "$(INSTALL_DIR)/OSEF Editor.app"
-	@echo "Installed $(INSTALL_DIR)/OSEF Editor.app (open it from Launchpad, Spotlight or Finder)"
+	@rm -rf "$(INSTALL_DIR)/$(APP_NAME)"
+	@ditto "$(APP)" "$(INSTALL_DIR)/$(APP_NAME)"
+	@echo "Installed $(INSTALL_DIR)/$(APP_NAME) (open it from Launchpad, Spotlight or Finder)"
 
 uninstall:
-	rm -rf "$(INSTALL_DIR)/OSEF Editor.app"
+	rm -rf "$(INSTALL_DIR)/$(APP_NAME)"
 else
 app install uninstall:
 	@echo "The app bundle is macOS only; on this system run $(BIN) directly."
+
+icons: all
+	@echo "  ICONS from $(EDITOR_DIR)/assets/icon.png (the macOS .icns needs iconutil: run this on a Mac)"
+	$(Q)rm -rf "$(EDITOR_DIR)/assets/OSEF.iconset"
+	$(Q)$(BIN) --make-icons "$(EDITOR_DIR)/assets/icon.png" "$(EDITOR_DIR)/assets" "$(SRC_DIR)/app/icon_data.inc"
+	$(Q)rm -rf "$(EDITOR_DIR)/assets/OSEF.iconset"
+	$(Q)$(MAKE) --no-print-directory -f "$(EDITOR_DIR)/Makefile" all
 endif
 
 # Objects wait for the bootstrap (order-only: it never forces a rebuild).

@@ -12,6 +12,7 @@
 #include <iterator>
 #include <optional>
 #include <vector>
+#include <utility>
 
 using osef::editor::encode_png;
 using osef::editor::write_png;

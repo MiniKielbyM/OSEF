@@ -8,6 +8,8 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <chrono>
+#include <vector>
 
 using namespace osef::editor;
 namespace fs = std::filesystem;

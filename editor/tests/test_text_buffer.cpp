@@ -6,6 +6,8 @@
 
 #include <ostream>
 #include <string>
+#include <string_view>
+#include <cstdint>
 
 namespace osef::editor {
 std::ostream& operator<<(std::ostream& os, const TextPos& p) { return os << "(" << p.line << ", " << p.col << ")"; }

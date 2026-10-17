@@ -13,6 +13,9 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <memory>
+#include <vector>
+#include <cstdint>
 
 using namespace osef::editor;
 namespace fs = std::filesystem;

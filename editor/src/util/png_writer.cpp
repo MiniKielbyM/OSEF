@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <system_error>
+#include <utility>
 
 namespace osef::editor {
 

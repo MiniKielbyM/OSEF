@@ -5,6 +5,8 @@
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <cstdlib>
+#include <utility>
 
 namespace osef::editor {
 

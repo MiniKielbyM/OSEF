@@ -27,6 +27,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <utility>
 
 namespace osef::editor {
 namespace fs = std::filesystem;

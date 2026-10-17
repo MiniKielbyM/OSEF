@@ -1,6 +1,7 @@
 #include "model/component_catalog.h"
 
 #include <utility>
+#include <vector>
 
 namespace osef::editor {
 

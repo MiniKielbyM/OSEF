@@ -14,6 +14,8 @@
 #define OSEF_GETPID _getpid
 #else
 #include <unistd.h>
+#include <utility>
+#include <string_view>
 #define OSEF_GETPID getpid
 #endif
 

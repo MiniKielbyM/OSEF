@@ -21,6 +21,7 @@
 #include <system_error>
 #include <unordered_map>
 #include <vector>
+#include <cstdint>
 
 namespace osef::editor {
 namespace {

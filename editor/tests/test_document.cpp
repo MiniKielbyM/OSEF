@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <cstdint>
 
 using namespace osef::editor;
 namespace fs = std::filesystem;

@@ -8,6 +8,8 @@
 #include <functional>
 #include <set>
 #include <string>
+#include <memory>
+#include <utility>
 
 using namespace osef::editor;
 
