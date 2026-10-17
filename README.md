@@ -85,8 +85,9 @@ Change `.firmware(...)` and rebuild to switch.
 ```sh
 tools/bootstrap.sh --with-qemu       # one-time: builds only the tools you don't have, into .toolchain/
 
-make iso OS=minimal                  # -> build/minimal.elf + build/minimal.iso (BIOS)
-make iso OS_DIR=path/to/my_os        # -> build/my_os.iso, firmware as declared
+make iso OS=minimal                  # -> examples/minimal/minimal.iso (BIOS), copy in build/
+make iso OS_DIR=path/to/my_os        # -> path/to/my_os/my_os.iso, firmware as declared
+                                     #    (EXPORT_ISO=0: only build/my_os.iso)
 make iso                             # every example
 make run-iso OS=myos                 # boot it in QEMU (window = framebuffer console,
                                      #  this terminal = serial console; OVMF for UEFI)
@@ -151,6 +152,108 @@ the hosted engine on Linux, macOS and Windows. A bare-metal job on Linux
 (clang, lld, xorriso, QEMU, OVMF) builds the ISOs with CMake and with the
 Makefile and boots them in QEMU. It also builds the WebAssembly target
 (experimental).
+
+## Building the app on each operating system
+
+The OSEF editor (the Unity-style app in [editor/](editor)) is a native C++20
+program using Dear ImGui, GLFW and OpenGL 3.2. Its **Run hosted**, **Boot in
+QEMU** and **Build ISO image** buttons call `make` in this folder, so to build
+ISOs from the app you need the ISO tools as well. Steps for each system:
+
+### macOS (Intel or Apple Silicon)
+
+1. Install Apple's command line tools (clang, make, git):
+   ```sh
+   xcode-select --install
+   ```
+2. Build the ISO tools and the editor's third-party sources. This needs no
+   Homebrew and no sudo; everything goes into `.toolchain/`. It takes about
+   15 minutes the first time, mostly QEMU.
+   ```sh
+   tools/bootstrap.sh --with-qemu --with-editor
+   ```
+3. Build and start the app:
+   ```sh
+   make -C editor                     # -> build/editor/osef-editor
+   build/editor/osef-editor           # opens examples/myos; File > New OS… (Cmd+N) for your own
+   ```
+
+If you already have Homebrew, `brew install lld xorriso qemu` can replace most
+of step 2. `tools/bootstrap.sh` uses tools it finds on your PATH and builds only
+what is missing.
+
+### Linux
+
+1. Install a compiler, the ISO tools and GLFW's window-system headers.
+
+   Debian / Ubuntu:
+   ```sh
+   sudo apt install build-essential clang lld cmake git curl python3 xorriso \
+       qemu-system-x86 ovmf libx11-dev libxrandr-dev libxinerama-dev \
+       libxcursor-dev libxi-dev libgl-dev libwayland-dev libxkbcommon-dev wayland-protocols
+   ```
+   Fedora:
+   ```sh
+   sudo dnf install gcc-c++ make clang lld cmake git curl python3 xorriso \
+       qemu-system-x86 edk2-ovmf libX11-devel libXrandr-devel libXinerama-devel \
+       libXcursor-devel libXi-devel mesa-libGL-devel wayland-devel libxkbcommon-devel
+   ```
+   Arch:
+   ```sh
+   sudo pacman -S base-devel clang lld cmake git curl python xorriso qemu-desktop \
+       edk2-ovmf libx11 libxrandr libxinerama libxcursor libxi mesa wayland libxkbcommon
+   ```
+2. Fetch Limine and the editor's third-party sources:
+   ```sh
+   tools/bootstrap.sh --with-editor
+   ```
+3. Build and start the app:
+   ```sh
+   make -C editor && build/editor/osef-editor
+   ```
+   Or use CMake (GLFW's CMake build supports both X11 and Wayland):
+   ```sh
+   cmake -S editor -B build-editor -DCMAKE_BUILD_TYPE=Release
+   cmake --build build-editor && build-editor/osef-editor
+   ```
+
+### Windows 10 / 11
+
+1. Install **Visual Studio 2022** with the "Desktop development with C++"
+   workload. It includes CMake. Also install Git.
+2. Build the app from a *Developer PowerShell for VS 2022*. CMake downloads the
+   pinned ImGui, GLFW and font archives itself:
+   ```powershell
+   cmake -S editor -B build-editor
+   cmake --build build-editor --config Release
+   .\build-editor\Release\osef-editor.exe
+   ```
+3. To use the app's Run / Build ISO / QEMU buttons, `make`, clang, lld,
+   xorriso and QEMU must be on your PATH. The simplest way is
+   [MSYS2](https://www.msys2.org) (UCRT64 shell):
+   ```sh
+   pacman -S make mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-lld \
+       mingw-w64-ucrt-x86_64-xorriso mingw-w64-ucrt-x86_64-qemu python git
+   tools/bootstrap.sh
+   ```
+   Alternatively, build ISOs inside **WSL 2** (Ubuntu) by following the Linux
+   steps; the hosted engine and the app itself also build natively with MSVC.
+
+> Windows support is written but has not been tested yet. Builds on macOS
+> (Intel) are tested; CI builds the hosted engine on Windows, macOS and Linux.
+
+### Check that everything works
+
+On any system:
+
+```sh
+make test               # engine, hardware-declaration and build-system tests
+make -C editor test     # editor tests (headless)
+make test-iso           # boots every example ISO in QEMU, BIOS and UEFI
+```
+
+The CMake equivalents are `ctest --test-dir build-cmake` and
+`ctest --test-dir build-editor`.
 
 ## Writing an OS
 
