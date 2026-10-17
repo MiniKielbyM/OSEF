@@ -13,9 +13,9 @@
 
 OSEF_HARDWARE(osef::Hardware()
     .name("MyOS")
-    .arch(osef::Arch::x86_64)                  // required
-    .firmware(osef::Firmware::UEFI)            // required: BIOS or UEFI
-    .devices(osef::Hw::Serial | osef::Hw::Framebuffer | osef::Hw::PS2Keyboard)
+    .arch(osef::Arch::x86_64)
+    .firmware(osef::Firmware::UEFI)
+    .devices(osef::Hw::Serial | osef::Hw::Framebuffer | osef::Hw::PS2Keyboard | osef::Hw::RTC | osef::Hw::PCI)
     .memory_mb(128));
 
 #include <osef/osef.h>

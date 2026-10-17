@@ -45,9 +45,9 @@ std::vector<std::string> validate_new_project(const NewProjectOptions& o) {
             problems.push_back("The name cannot contain quotes, backslashes or control characters.");
             break;
         }
-    if (o.firmware != "UEFI" && o.firmware != "BIOS") problems.push_back("Choose UEFI or BIOS.");
-    if (!o.screen && !o.serial) problems.push_back("Turn on the screen or the serial port, so the OS can show text.");
-    if (o.memory_mb < 32) problems.push_back("The OS needs at least 32 MiB of memory.");
+    if (o.firmware != "UEFI" && o.firmware != "BIOS") problems.push_back("Firmware must be UEFI or BIOS.");
+    if (!o.screen && !o.serial) problems.push_back("Enable a console device: Framebuffer or COM1 UART.");
+    if (o.memory_mb < 32) problems.push_back("memory_mb must be >= 32 (OSEF_HARDWARE static_assert).");
     if (o.folder.empty()) {
         problems.push_back("Choose a folder for the project.");
     } else {

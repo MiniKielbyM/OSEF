@@ -810,39 +810,39 @@ void EditorApp::draw_new_os_dialog() {
         ImGui::SameLine(label_w);
         ImGui::SetNextItemWidth(-1.0f);
     };
-    ImGui::TextWrapped("Answer a few questions and OSEF creates a working operating system for you. "
-                       "You can change everything later in OS Settings.");
+    ImGui::TextWrapped("Scaffolds a new OSEF project: main.cpp with an OSEF_HARDWARE declaration, plus "
+                       "osef-settings.ini and the generated osef_generated.cpp. Everything is editable later.");
     ImGui::Spacing();
 
-    label("1. Name");
+    label("1. OS name");
     if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
     if (ImGui::InputText("##new_name", &new_os_name_) && !new_os_folder_edited_)
         new_os_folder_ = default_project_folder(new_os_name_).string();
-    label("   Saved in");
+    label("   Project directory");
     if (ImGui::InputText("##new_folder", &new_os_folder_)) new_os_folder_edited_ = true;
 
-    label("2. Type of PC");
-    if (ImGui::RadioButton("Modern PC (UEFI)", new_os_uefi_)) new_os_uefi_ = true;
+    label("2. Boot firmware");
+    if (ImGui::RadioButton("UEFI (x86_64)", new_os_uefi_)) new_os_uefi_ = true;
     ImGui::SameLine();
-    if (ImGui::RadioButton("Older PC (BIOS)", !new_os_uefi_)) new_os_uefi_ = false;
+    if (ImGui::RadioButton("Legacy BIOS", !new_os_uefi_)) new_os_uefi_ = false;
     ImGui::SetCursorPosX(label_w);
-    ImGui::TextDisabled("Not sure? Pick Modern PC: it also works in virtual machines.");
+    ImGui::TextDisabled("UEFI is the default for modern hardware and QEMU+OVMF; BIOS for legacy/CSM machines.");
 
-    label("3. Hardware");
-    ImGui::Checkbox("Screen", &new_os_screen_);
+    label("3. Devices");
+    ImGui::Checkbox("Framebuffer", &new_os_screen_);
     ImGui::SameLine();
-    ImGui::Checkbox("Keyboard", &new_os_keyboard_);
+    ImGui::Checkbox("PS/2 kbd", &new_os_keyboard_);
     ImGui::SameLine();
-    ImGui::Checkbox("Serial port", &new_os_serial_);
+    ImGui::Checkbox("COM1 UART", &new_os_serial_);
     ImGui::SameLine();
-    ImGui::Checkbox("Clock", &new_os_clock_);
+    ImGui::Checkbox("CMOS RTC", &new_os_clock_);
     ImGui::SameLine();
     ImGui::Checkbox("PCI", &new_os_pci_);
-    label("   Memory");
-    static const char* const memory_labels[] = {"64 MiB (tiny)", "128 MiB (recommended)", "256 MiB", "512 MiB"};
+    label("   Minimum RAM");
+    static const char* const memory_labels[] = {"64 MiB", "128 MiB (default)", "256 MiB", "512 MiB"};
     ImGui::Combo("##new_mem", &new_os_memory_, memory_labels, 4);
 
-    label("4. Look");
+    label("4. Console theme");
     const auto& looks = look_presets();
     new_os_look_ = std::clamp(new_os_look_, 0, static_cast<int>(looks.size()) - 1);
     if (ImGui::BeginCombo("##new_look", looks[static_cast<size_t>(new_os_look_)].name.c_str())) {
@@ -853,8 +853,8 @@ void EditorApp::draw_new_os_dialog() {
         }
         ImGui::EndCombo();
     }
-    label("5. Extras");
-    ImGui::Checkbox("Add a few example programs (hello, a guessing game, a countdown)", &new_os_samples_);
+    label("5. Templates");
+    ImGui::Checkbox("Generate sample programs (hello, guess, countdown, clock)", &new_os_samples_);
 
     NewProjectOptions o;
     o.name = new_os_name_;
@@ -875,7 +875,7 @@ void EditorApp::draw_new_os_dialog() {
     if (!new_os_error_.empty()) ImGui::TextColored(theme::color_vec(Color::Error), "%s", new_os_error_.c_str());
     ImGui::Separator();
     ImGui::BeginDisabled(!problems.empty());
-    if (ImGui::Button("Create my OS", ImVec2(160, 0))) {
+    if (ImGui::Button("Create project", ImVec2(160, 0))) {
         std::string error;
         const fs::path main = create_new_project(o, &error);
         if (main.empty()) {

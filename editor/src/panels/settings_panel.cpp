@@ -238,11 +238,11 @@ void save_main(EditorContext& ctx) {
 
 void startup_section(EditorContext& ctx) {
     Project& project = *ctx.project;
-    if (!section(ctx, "Start-up", "The basics: what your OS is called and what kind of PC it starts on.")) return;
+    if (!section(ctx, "Boot & system", "OS identity, boot firmware and the minimum RAM the kernel requires.")) return;
     bool hw_changed = false;
     Component& os = project.root();
     if (Property* name = os.property("name")) {
-        row("Name", "Shown when the OS starts and in its prompt (up to 31 characters).");
+        row("OS name", "OSEF_HARDWARE .name(): shown in the boot banner and the shell prompt (max 31 chars).");
         std::string value = name->s;
         if (ImGui::InputText("##os_name", &value, ImGuiInputTextFlags_EnterReturnsTrue) ||
             ImGui::IsItemDeactivatedAfterEdit()) {
@@ -255,24 +255,24 @@ void startup_section(EditorContext& ctx) {
     }
     if (Component* fw = project.find("boot.firmware")) {
         if (Property* p = fw->property("firmware")) {
-            row("Type of PC", "How the computer starts the OS. The bootable ISO only works on this kind of PC.");
+            row("Boot firmware", "OSEF_HARDWARE .firmware(): the ISO gets only this boot path (El Torito BIOS or EFI system partition).");
             for (const EnumOption& o : p->options) {
                 const bool uefi = o.label == "UEFI";
-                const std::string label = uefi ? "Modern PC (UEFI)" : "Older PC (BIOS)";
+                const std::string label = uefi ? "UEFI (x86_64)" : "Legacy BIOS";
                 if (ImGui::RadioButton(label.c_str(), p->i == o.value) && p->i != o.value) {
                     p->i = o.value;
                     project.apply_property(*fw, *p);
                     hw_changed = true;
                 }
-                ImGui::SetItemTooltip("%s", uefi ? "PCs from about 2012 on, and most virtual machines."
-                                                 : "Older PCs, or new ones with \"legacy boot\" turned on.");
+                ImGui::SetItemTooltip("%s", uefi ? "UEFI x86_64: Limine BOOTX64.EFI on an EFI system partition. Modern PCs and VMs (OVMF)."
+                                                 : "Legacy BIOS: El Torito no-emulation boot via limine-bios-cd.bin. Older PCs, CSM, SeaBIOS.");
                 if (&o != &p->options.back()) ImGui::SameLine();
             }
         }
     }
     if (Component* mem = project.find("hw.memory")) {
         if (Property* p = mem->property("memory_mb")) {
-            row("Memory", "The least memory (RAM) the OS needs. The virtual PC gets this much.");
+            row("Minimum RAM", "OSEF_HARDWARE .memory_mb(): the kernel panics at boot with less usable RAM; also the QEMU -m size.");
             int mb = static_cast<int>(p->i);
             if (ImGui::SliderInt("##memory", &mb, 32, 4096, "%d MiB", ImGuiSliderFlags_Logarithmic) ||
                 ImGui::IsItemDeactivatedAfterEdit()) {
@@ -289,12 +289,12 @@ void startup_section(EditorContext& ctx) {
 }
 
 bool look_section(EditorContext& ctx, OsSettings& s) {
-    if (!section(ctx, "Look & feel", "How your OS looks when it runs.")) return false;
+    if (!section(ctx, "Console appearance", "Framebuffer/terminal console theme (KernelConfig::appearance), ANSI 16-color palette.")) return false;
     bool changed = false;
     preview(ctx, s, ctx.project->name());
     ImGui::Spacing();
 
-    row("Style", "Ready-made color sets. You can still change each color below.");
+    row("Theme preset", "Predefined foreground/background/prompt color sets; each color can be overridden below.");
     const LookPreset* look = current_look(s);
     if (ImGui::BeginCombo("##look", look ? look->name.c_str() : "Custom")) {
         for (const LookPreset& p : look_presets()) {
@@ -312,26 +312,26 @@ bool look_section(EditorContext& ctx, OsSettings& s) {
         }
         ImGui::EndCombo();
     }
-    row("Welcome message", "Shown when the OS starts. Press Enter for a new line.");
+    row("Welcome banner", "Appearance::welcome: printed by the shell on start, before /etc/motd.");
     changed |= ImGui::InputTextMultiline("##welcome", &s.welcome, ImVec2(-1.0f, ImGui::GetTextLineHeight() * 3.2f));
-    row("Prompt", "What the OS shows when it waits for a command. {os} is the OS name, {cwd} the current folder.");
+    row("Shell prompt", "Appearance::prompt template: {os} = OS name, {cwd} = working directory.");
     changed |= ImGui::InputText("##prompt", &s.prompt);
-    row("Text color");
+    row("Foreground (SGR 3x/9x)");
     changed |= color_combo("##text", s.text_color, 7);
-    row("Background");
+    row("Background (SGR 4x/10x)");
     changed |= color_combo("##bg", s.background, 0);
-    row("Name color", "Color of the OS name in the prompt.");
+    row("Prompt {os} color", "Color of the OS name in the prompt.");
     changed |= color_combo("##namec", s.prompt_name_color, 7);
-    row("Folder color", "Color of the current folder in the prompt.");
+    row("Prompt {cwd} color", "Color of the working directory in the prompt.");
     changed |= color_combo("##pathc", s.prompt_path_color, 7);
-    row("Text size", "Bigger text is easier to read on large screens.");
+    row("Font scale", "Framebuffer console glyph scale (8x8 font); Automatic picks 2x at >= 1600 px width.");
     static const char* const sizes[] = {"Automatic", "Small (1x)", "Medium (2x)", "Large (3x)", "Huge (4x)"};
     changed |= ImGui::Combo("##size", &s.text_size, sizes, 5);
     return changed;
 }
 
 void hardware_section(EditorContext& ctx) {
-    if (!section(ctx, "Hardware", "The devices your OS uses. At least the screen or the serial port must be on."))
+    if (!section(ctx, "Devices & drivers", "OSEF_HARDWARE .devices(): drivers initialized at boot. Needs a console device (framebuffer or serial)."))
         return;
     struct Dev {
         const char* id;
@@ -339,11 +339,11 @@ void hardware_section(EditorContext& ctx) {
         const char* help;
     };
     static const Dev devices[] = {
-        {"hw.display", "Screen", "Shows text on the monitor (framebuffer console)."},
-        {"hw.keyboard", "Keyboard", "Lets people type (PS/2 keyboard; USB keyboards usually work too)."},
-        {"hw.serial", "Serial port", "Text over a serial cable. Handy for debugging and for the virtual PC's terminal."},
-        {"hw.rtc", "Clock", "The real date and time (the PC's battery-backed clock)."},
-        {"hw.pci", "Device list (PCI)", "Finds the PC's expansion devices; try the 'lspci' command."},
+        {"hw.display", "Framebuffer console", "Limine framebuffer, 32 bpp text console (Hw::Framebuffer)."},
+        {"hw.keyboard", "PS/2 keyboard", "i8042 controller, scancode set 1, IRQ 1 (Hw::PS2Keyboard). USB keyboards via firmware emulation."},
+        {"hw.serial", "Serial UART (COM1)", "16550 UART at 0x3F8, IRQ 4 (Hw::Serial). Console I/O and debugging; QEMU -serial stdio."},
+        {"hw.rtc", "CMOS RTC", "MC146818-compatible real-time clock, wall-clock date/time (Hw::RTC)."},
+        {"hw.pci", "PCI enumeration", "Configuration-space scan via ports 0xCF8/0xCFC (Hw::PCI); see the lspci command."},
     };
     bool changed = false;
     for (const Dev& d : devices) {
@@ -359,27 +359,27 @@ void hardware_section(EditorContext& ctx) {
         hint(d.help);
     }
     ImGui::BeginDisabled();
-    for (const char* planned : {"Mouse", "USB", "Disk storage", "Network", "Sound"}) {
+    for (const char* planned : {"PS/2 mouse (IRQ 12)", "USB (xHCI)", "Storage (AHCI / NVMe)", "Network (virtio-net / e1000)", "Audio (Intel HDA)"}) {
         bool off = false;
         ImGui::Checkbox(planned, &off);
         ImGui::SameLine(label_width());
-        hint("Coming later: OSEF does not support this device yet.");
+        hint("Planned: no driver in the engine yet.");
     }
     ImGui::EndDisabled();
     if (changed) save_main(ctx);
 }
 
 bool programs_section(EditorContext& ctx, SettingsPanel::State& st, OsSettings& s) {
-    if (!section(ctx, "Programs", "Commands people can run in your OS. Pick a type, give it a name, done."))
+    if (!section(ctx, "Programs", "Processes registered in the ProgramRegistry, generated from templates into osef_generated.cpp."))
         return false;
     bool changed = false;
-    changed |= ImGui::Checkbox("Include the command shell", &s.shell);
-    ImGui::SetItemTooltip("The shell is where people type commands like 'help' or 'ls'.");
+    changed |= ImGui::Checkbox("Shell (ShellModule)", &s.shell);
+    ImGui::SetItemTooltip("Registers the 'sh' program: builtins like help, ls, ps, cat, hw, lspci.");
 
-    row("Start at boot", "The first program the OS runs. When it finishes, the OS turns off.");
-    const std::string current = s.start_program == "sh" ? "Command shell" : s.start_program;
+    row("Init process (PID 1)", "KernelConfig::init_program: the first process. The kernel halts when it exits.");
+    const std::string current = s.start_program == "sh" ? "sh (shell)" : s.start_program;
     if (ImGui::BeginCombo("##start", current.c_str())) {
-        if (ImGui::Selectable("Command shell", s.start_program == "sh")) {
+        if (ImGui::Selectable("sh (shell)", s.start_program == "sh")) {
             s.start_program = "sh";
             s.shell = true;
             changed = true;
@@ -406,7 +406,7 @@ bool programs_section(EditorContext& ctx, SettingsPanel::State& st, OsSettings& 
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60.0f);
         if (ImGui::SmallButton("Remove")) remove = static_cast<int>(i);
         if (t) hint(t->description.c_str());
-        row("Command", "What people type to run it: lowercase letters, numbers, - and _.");
+        row("Program name", "Registry key and shell command: [a-z][a-z0-9_-]*, must not shadow a builtin.");
         const std::string before = p.name;
         if (ImGui::InputText("##name", &p.name)) {
             if (s.start_program == before) s.start_program = p.name;
@@ -414,7 +414,7 @@ bool programs_section(EditorContext& ctx, SettingsPanel::State& st, OsSettings& 
         }
         if (!is_valid_command_name(p.name))
             ImGui::TextColored(theme::color_vec(Color::Warning), "Use lowercase letters, numbers, - or _ (start with a letter).");
-        row("Description", "Shown by the 'help' command.");
+        row("Description", "Program::description, listed by `help`.");
         changed |= ImGui::InputText("##desc", &p.description);
         if (t && !t->text_label.empty()) {
             row(t->text_label.c_str());
@@ -464,14 +464,14 @@ bool programs_section(EditorContext& ctx, SettingsPanel::State& st, OsSettings& 
 }
 
 bool files_section(EditorContext& ctx, OsSettings& s) {
-    if (!section(ctx, "Files", "Files that are already there when the OS starts. Try 'cat <file>' to read one."))
+    if (!section(ctx, "Initial filesystem", "Files written to the root RamFS at boot (volatile; no persistent storage yet)."))
         return false;
     bool changed = false;
     int remove = -1;
     for (size_t i = 0; i < s.files.size(); ++i) {
         FileSpec& f = s.files[i];
         ImGui::PushID(static_cast<int>(i));
-        row("Path", "Where the file lives, for example /home/notes.txt.");
+        row("Absolute path", "VFS path; parent directories are created, e.g. /home/notes.txt.");
         ImGui::SetNextItemWidth(-70.0f);
         changed |= ImGui::InputText("##path", &f.path);
         ImGui::SameLine();
@@ -499,8 +499,8 @@ void problems_box(EditorContext& ctx) {
     if (!hw.found) {
         ImGui::PushStyleColor(ImGuiCol_ChildBg, theme::color(Color::InputBg));
         ImGui::BeginChild("##nodecl", ImVec2(0, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
-        ImGui::TextColored(theme::color_vec(Color::Error), "This OS does not say what hardware it runs on yet.");
-        if (ImGui::Button("Fix it: add the standard hardware")) {
+        ImGui::TextColored(theme::color_vec(Color::Error), "main.cpp has no OSEF_HARDWARE declaration: the kernel will not link.");
+        if (ImGui::Button("Insert default OSEF_HARDWARE declaration")) {
             project.add_hardware_declaration();
             save_main(ctx);
         }
@@ -530,18 +530,18 @@ void run_buttons(EditorContext& ctx) {
     const float gap = ImGui::GetStyle().ItemSpacing.x;
     const float w = std::floor((ImGui::GetContentRegionAvail().x - 2 * gap) / 3.0f);
     if (const BuildTarget* t = find("run");
-        big_button("##try", icons::Glyph::Play, theme::color(Color::Implemented), "Try it", w, t && idle,
-                   "Runs your OS right here as a normal app (fastest)."))
+        big_button("##try", icons::Glyph::Play, theme::color(Color::Implemented), "Run hosted", w, t && idle,
+                   "Builds and runs the OS as a native process on this machine (make run). Fastest iteration."))
         ctx.run_target(*t);
     ImGui::SameLine();
     if (const BuildTarget* t = find("qemu");
-        big_button("##vm", icons::Glyph::Play, IM_COL32(0x7F, 0xA8, 0xE8, 0xFF), "Run on a virtual PC", w, t && idle,
-                   "Boots the real OS in a virtual PC (QEMU), exactly like a real computer would."))
+        big_button("##vm", icons::Glyph::Play, IM_COL32(0x7F, 0xA8, 0xE8, 0xFF), "Boot in QEMU", w, t && idle,
+                   "Builds the freestanding x86_64 kernel + ISO and boots it in QEMU with the declared firmware (make run-iso)."))
         ctx.run_target(*t);
     ImGui::SameLine();
     if (const BuildTarget* t = find("iso");
-        big_button("##iso", icons::Glyph::Build, theme::color(Color::Text), "Make bootable ISO", w, t && idle,
-                   "Creates an .iso file in the build folder. Put it on a USB stick or open it in a virtual machine."))
+        big_button("##iso", icons::Glyph::Build, theme::color(Color::Text), "Build ISO image", w, t && idle,
+                   "Links build/<os>.elf and packages build/<os>.iso with Limine + xorriso (make iso). Hybrid image: dd to USB or attach to a VM."))
         ctx.run_target(*t);
 }
 
@@ -559,7 +559,7 @@ void SettingsPanel::draw(EditorContext& ctx) {
     if (ctx.fonts.ui_bold) ImGui::PushFont(ctx.fonts.ui_bold, ImGui::GetFontSize() * 1.35f);
     ImGui::TextUnformatted(project.name().c_str());
     if (ctx.fonts.ui_bold) ImGui::PopFont();
-    hint("Change anything below: your OS is updated right away. Then press Try it.");
+    hint("Edits update OSEF_HARDWARE in main.cpp and regenerate osef_generated.cpp immediately.");
     ImGui::Spacing();
     run_buttons(ctx);
     problems_box(ctx);
@@ -577,13 +577,13 @@ void SettingsPanel::draw(EditorContext& ctx) {
     ImGui::Spacing();
     ImGui::Separator();
     if (ctx.beginner_mode) {
-        if (ImGui::Button("Show the code (advanced)")) {
+        if (ImGui::Button("Show source (main.cpp, osef_generated.cpp)")) {
             ctx.beginner_mode = false;
             ctx.request_focus_code = true;
             ImGui::MarkIniSettingsDirty();
         }
         ImGui::SameLine();
-        hint("Everything here is also plain C++ you can edit.");
+        hint("All settings compile to plain C++; edit it directly in the Code panel.");
     }
 }
 
