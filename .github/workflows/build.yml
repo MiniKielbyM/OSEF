@@ -1,0 +1,112 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # The engine, the osef-image tool, the examples and the tests as native
+  # programs (CMake), plus the Makefile path on Linux and macOS.
+  hosted:
+    name: hosted (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build-cmake -DCMAKE_BUILD_TYPE=Release -DOSEF_BUILD_ISO=OFF
+
+      - name: Build
+        run: cmake --build build-cmake --config Release --parallel
+
+      - name: Test (core, kernel, hardware declarations)
+        run: ctest --test-dir build-cmake -C Release --output-on-failure
+
+      - name: Makefile build and tests
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          BM_CXX="$(command -v clang++ || command -v clang++-18 || echo clang++)"
+          make -j4 BM_CXX="$BM_CXX"
+          make test BM_CXX="$BM_CXX"
+
+  # Bootable ISOs: freestanding kernels (clang + lld), Limine, xorriso, and
+  # boot tests in QEMU with SeaBIOS (BIOS OSes) and OVMF (UEFI OSes).
+  bare-metal:
+    runs-on: ubuntu-latest
+    env:
+      QEMU: /usr/bin/qemu-system-x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang lld xorriso qemu-system-x86 ovmf ninja-build
+
+      - name: Find the UEFI firmware
+        run: |
+          for f in /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_CODE.fd /usr/share/ovmf/OVMF.fd; do
+            if [ -f "$f" ]; then echo "OVMF=$f" >> "$GITHUB_ENV"; echo "UEFI firmware: $f"; break; fi
+          done
+
+      - name: Limine
+        run: tools/bootstrap/limine.sh
+
+      - name: Tool summary
+        run: tools/bootstrap.sh --check --with-qemu
+
+      # OSEF_BUILD_ISO=ON: configuring fails if clang, ld.lld, xorriso or Limine is missing.
+      - name: Configure
+        run: >-
+          cmake -S . -B build-cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DOSEF_BUILD_ISO=ON
+          -DOSEF_QEMU="$QEMU" -DOSEF_OVMF="$OVMF"
+
+      - name: Build (engine, tests, kernels, ISOs)
+        run: cmake --build build-cmake
+
+      - name: Test
+        run: ctest --test-dir build-cmake --output-on-failure
+
+      - name: Boot tests (CMake ISOs)
+        env:
+          OSEF_IMAGE: ${{ github.workspace }}/build-cmake/osef-image
+          XORRISO: xorriso
+          BUILD: ${{ github.workspace }}/build-cmake/images
+        run: bash tests/iso/boot_test.sh minimal myos
+
+      # The editor drives the Makefile (make iso / run-iso OS_DIR=...), so test it too.
+      - name: Makefile ISO pipeline
+        run: |
+          make -j4 iso BM_CXX=clang++
+          OSEF_CROSS_CHECK=0 make test-iso BM_CXX=clang++ QEMU="$QEMU" OVMF="$OVMF"
+
+      - name: Upload ISOs, serial logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: osef-iso
+          if-no-files-found: ignore
+          path: |
+            build-cmake/images/*.iso
+            build-cmake/images/*.log
+            build-cmake/images/*.png
+            build/*-serial.log
+            build/*-screen.png
+
+  web:
+    name: web (experimental)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: Build (WebAssembly)
+        run: |
+          emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-web
