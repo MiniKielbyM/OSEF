@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=OSEF Editor
+Comment=Build your own operating system like a game
+Exec=osef-editor %F
+Icon=osef-editor
+Terminal=false
+Categories=Development;IDE;

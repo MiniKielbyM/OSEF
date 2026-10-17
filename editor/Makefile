@@ -124,7 +124,7 @@ ALL_OBJS := $(EDITOR_OBJS) $(EDITOR_NATIVE_OBJS) $(IMGUI_OBJS) $(GLFW_OBJS) $(TE
 
 # ---- Targets -------------------------------------------------------------------
 
-.PHONY: all run test deps clean app install uninstall
+.PHONY: all run test deps clean app install uninstall icons
 .DEFAULT_GOAL := all
 
 all: deps $(BIN)
@@ -168,18 +168,23 @@ ICNS        := $(BUILD)/OSEF.icns
 INSTALL_DIR ?= $(shell if [ -w /Applications ]; then echo /Applications; else echo "$$HOME/Applications"; fi)
 
 ifeq ($(UNAME_S),Darwin)
-# App icon: editor/macos/OSEF.icns if you provide one, else the built-in icon
-# (window_icon.cpp) rendered at 16-1024 px and packed with iconutil.
-CUSTOM_ICNS := $(wildcard $(EDITOR_DIR)/macos/OSEF.icns)
-ifneq ($(CUSTOM_ICNS),)
-$(ICNS): $(CUSTOM_ICNS)
-	@echo "  ICON  $@ (from editor/macos/OSEF.icns)"
+# App icon: editor/assets/icon.png is the single source for every platform.
+# `make -C editor icons` regenerates the derived files (committed, so other
+# systems need no image tools): assets/icon.ico (Windows), assets/OSEF.icns
+# (macOS) and src/app/icon_data.inc (window/Dock icon at runtime).
+ICON_PNG := $(EDITOR_DIR)/assets/icon.png
+$(ICNS): $(EDITOR_DIR)/assets/OSEF.icns
+	@echo "  ICON  $@"
 	$(Q)cp "$<" "$@"
-else
-$(ICNS): $(BIN)
-	@echo "  ICON  $@ (generated)"
-	$(Q)rm -rf "$(ICONSET)" && $(BIN) --write-iconset "$(ICONSET)" && iconutil -c icns "$(ICONSET)" -o "$@"
-endif
+
+icons: all
+	@echo "  ICONS from $(ICON_PNG)"
+	$(Q)rm -rf "$(EDITOR_DIR)/assets/OSEF.iconset"
+	$(Q)$(BIN) --make-icons "$(ICON_PNG)" "$(EDITOR_DIR)/assets" "$(SRC_DIR)/app/icon_data.inc"
+	$(Q)iconutil -c icns "$(EDITOR_DIR)/assets/OSEF.iconset" -o "$(EDITOR_DIR)/assets/OSEF.icns"
+	$(Q)rm -rf "$(EDITOR_DIR)/assets/OSEF.iconset"
+	$(Q)$(MAKE) --no-print-directory -f "$(EDITOR_DIR)/Makefile" all
+	@echo "Updated assets/icon.ico, assets/OSEF.icns and src/app/icon_data.inc; rebuild the app with: make -C editor app"
 
 app: all $(ICNS) $(EDITOR_DIR)/macos/Info.plist.in
 	@echo "  APP   $(APP)"
@@ -205,6 +210,13 @@ uninstall:
 else
 app install uninstall:
 	@echo "The app bundle is macOS only; on this system run $(BIN) directly."
+
+icons: all
+	@echo "  ICONS from $(EDITOR_DIR)/assets/icon.png (the macOS .icns needs iconutil: run this on a Mac)"
+	$(Q)rm -rf "$(EDITOR_DIR)/assets/OSEF.iconset"
+	$(Q)$(BIN) --make-icons "$(EDITOR_DIR)/assets/icon.png" "$(EDITOR_DIR)/assets" "$(SRC_DIR)/app/icon_data.inc"
+	$(Q)rm -rf "$(EDITOR_DIR)/assets/OSEF.iconset"
+	$(Q)$(MAKE) --no-print-directory -f "$(EDITOR_DIR)/Makefile" all
 endif
 
 # Objects wait for the bootstrap (order-only: it never forces a rebuild).

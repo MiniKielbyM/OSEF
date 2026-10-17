@@ -144,6 +144,8 @@ jobs:
           mkdir -p osef-editor-linux
           cp build-editor/osef-editor osef-editor-linux/
           cp -R build-editor/fonts osef-editor-linux/fonts
+          cp editor/assets/icon.png osef-editor-linux/osef-editor.png
+          cp editor/assets/osef-editor.desktop osef-editor-linux/
           tar -czf OSEF-Editor-Linux-x86_64.tar.gz osef-editor-linux
 
       - name: Package (Windows)

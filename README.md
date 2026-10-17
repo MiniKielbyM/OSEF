@@ -397,7 +397,7 @@ tests/hardware/        OSEF_HARDWARE fixtures (make hardware-check)
 tests/iso/             QEMU boot tests for the ISOs (make test-iso)
 ```
 
-## Current scope and roadmap
+## Current scope
 
 OSEF v0.1 runs your OS two ways from the same source: **hosted**, as an
 application on Windows, macOS, Linux or the web (much like a fantasy console),
@@ -412,3 +412,80 @@ Natural next steps:
 - **Editor**: a visual tool to compose and live-run an OS, the "Unity" layer
 - **More bare-metal targets**: the engine is freestanding; x86_64 (BIOS/UEFI via
   Limine) is the first bare-metal platform, ARM would be next.
+
+## Roadmap
+
+OSEF's goal is to be the game engine for operating systems: an engine that
+handles the hard parts and an editor that makes OS development approachable.
+This roadmap shows what is done and where the project is heading. Priorities
+may change based on feedback.
+
+## ✅ Done (v0.1)
+
+**Engine**
+- Kernel loop, scheduler, processes, modules and a program registry
+- VFS, IPC, syscalls and custom interrupt handlers (`on_irq` / `on_vector`)
+- Freestanding core library, with no C++ standard library required
+- `OSEF_HARDWARE` declarations that are checked at compile time
+
+**Bare metal (x86_64)**
+- Limine boot over BIOS or UEFI, enforced by the declared firmware
+- GDT/IDT, PIC, PIT, paging, heap, and page mapping for MMIO and ACPI
+- Drivers: serial, framebuffer console, PS/2 keyboard, RTC, PCI, and USB
+  (xHCI with HID keyboards)
+- ACPI soft power-off
+
+**Tooling**
+- Makefile and CMake builds, with `osef_add_os()` for your own projects
+- `tools/bootstrap.sh`, which builds the toolchain without sudo
+- CI on Linux, macOS and Windows, plus automated QEMU boot tests
+
+**Editor**
+- A Unity-style editor with a hierarchy, an inspector and a code editor
+- One-click Run, Build ISO and Boot in QEMU
+- An OS Settings panel and a New OS wizard for people who don't program
+- A native macOS app bundle
+
+## 🚧 Next (v0.2): Input & storage
+
+- [ ] PS/2 and USB HID mouse drivers (`Hw::Mouse`)
+- [ ] USB keyboards with full HID reports, not only boot protocol
+- [ ] Disk drivers: AHCI (SATA), then NVMe
+- [ ] A FAT32 file system on real disks, so files persist across reboots
+- [ ] Load OSEF programs from disk instead of linking them all into the kernel
+- [ ] A driver template in the editor (Component → New Device) that generates
+      a working skeleton
+- [ ] Packaged editor builds for Windows and Linux
+
+## 🔜 Soon (v0.3): A real multitasking kernel
+
+- [ ] Local APIC and IOAPIC timers and interrupts (replacing PIC/PIT on
+      modern hardware)
+- [ ] User mode (ring 3) with per-process address spaces
+- [ ] Preemptive scheduling alongside the current cooperative model
+- [ ] SMP support so processes run on multiple CPU cores
+- [ ] Crash isolation, so a faulting process is killed instead of panicking
+      the whole kernel
+
+## 🌐 Later (v0.4): Connectivity & graphics
+
+- [ ] Networking: a virtio-net / e1000 driver with a small TCP/IP stack
+- [ ] USB mass storage
+- [ ] A simple windowing and graphics API on the framebuffer, an "OSEF UI"
+- [ ] Sound (Intel HD Audio)
+- [ ] Stable WebAssembly builds so OSEF OSes can run in the browser
+
+## 🔭 Future: Beyond x86_64
+
+- [ ] ARM64 (AArch64) support, starting with QEMU `virt` and then Raspberry Pi
+- [ ] RISC-V support
+- [ ] An editor scene view for laying out processes, modules and IPC visually
+- [ ] Live debugging from the editor (QEMU GDB stub, breakpoints, memory
+      viewer)
+- [ ] An asset library for sharing modules, drivers, programs and themes
+- [ ] Tutorials and docs: "Build your first OS in 30 minutes"
+
+## Contributing
+
+Pick any unchecked item, open an issue to discuss it, and send a PR. Driver
+and documentation contributions are especially welcome.

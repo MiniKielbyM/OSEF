@@ -1,5 +1,7 @@
 #include "window_icon.h"
 
+#include "util/png_reader.h"
+
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -105,8 +107,23 @@ Pixels make_icon(int size) {
 
 std::vector<unsigned char> render_icon(int size) { return make_icon(size).data; }
 
+#include "app/icon_data.inc"  // kAppIconPng, generated from editor/assets/icon.png
+
+namespace {
+// The app icon from editor/assets/icon.png, or the drawn icon if that fails.
+Pixels app_icon_pixels() {
+    Image img;
+    if (decode_png(kAppIconPng, sizeof(kAppIconPng), img, nullptr) && img.width == img.height) {
+        Pixels pixels(img.width);
+        pixels.data = std::move(img.rgba);
+        return pixels;
+    }
+    return make_icon(256);
+}
+} // namespace
+
 void set_window_icon(GLFWwindow* window) {
-    static const Pixels pixels = make_icon(256);
+    static const Pixels pixels = app_icon_pixels();
 #if defined(__APPLE__)
     (void)window;
     osef_editor_set_macos_app_icon(pixels.data.data(), pixels.size, pixels.size);

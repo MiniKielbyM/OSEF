@@ -20,6 +20,7 @@
 #include "model/component.h"
 #include "model/document.h"
 #include "model/project.h"
+#include "util/app_icon.h"
 #include "util/png_writer.h"
 
 #include <algorithm>
@@ -872,8 +873,34 @@ int write_iconset(const fs::path& dir) {
     return 0;
 }
 
+// --make-icons <icon.png> <assets dir> <include>: every icon asset from one image.
+int make_icons(const fs::path& png, const fs::path& assets, const fs::path& include) {
+    osef::editor::Image master;
+    std::string error;
+    if (!osef::editor::read_png(png, master, &error)) {
+        std::fprintf(stderr, "osef-editor: %s: %s\n", png.string().c_str(), error.c_str());
+        return 1;
+    }
+    if (master.width != master.height)
+        std::fprintf(stderr, "osef-editor: warning: %s is %dx%d, not square; it will be stretched\n",
+                     png.string().c_str(), master.width, master.height);
+    if (!osef::editor::write_ico(assets / "icon.ico", master, &error) ||
+        !osef::editor::write_iconset(assets / "OSEF.iconset", master, &error) ||
+        !osef::editor::write_icon_include(include, master, &error)) {
+        std::fprintf(stderr, "osef-editor: %s\n", error.c_str());
+        return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char** argv) {
     if (argc == 3 && std::string_view(argv[1]) == "--write-iconset") return write_iconset(argv[2]);
+    if (argc == 3 && std::string_view(argv[1]) == "--write-default-icon") {
+        const std::vector<unsigned char> rgba = osef::editor::render_icon(1024);
+        std::string error;
+        return osef::editor::write_png(argv[2], 1024, 1024, rgba.data(), false, &error) ? 0 : 1;
+    }
+    if (argc == 5 && std::string_view(argv[1]) == "--make-icons") return make_icons(argv[2], argv[3], argv[4]);
 #if defined(__APPLE__)
     // Launched from Finder / the Dock, the app gets a minimal PATH; the build
     // buttons run make, clang, xorriso and QEMU, which may live in Homebrew.

@@ -56,6 +56,24 @@ build-editor/osef-editor examples/myos        # build-editor\Release\osef-editor
 If `editor/third_party/` is missing, CMake downloads the same pinned archives
 with FetchContent. Windows support is written but has not been tested yet.
 
+## App icon
+
+`editor/assets/icon.png` is the icon on every platform: the macOS app bundle
+and Dock, the Windows `.exe` (Explorer, taskbar), and the window icon on Linux.
+To use your own artwork:
+
+1. Save a square PNG (1024 x 1024 recommended, 8-bit, not interlaced) as
+   `editor/assets/icon.png`. To convert a WebP on macOS:
+   `sips -s format png my-icon.webp --out editor/assets/icon.png`.
+2. Run `make -C editor icons`. It regenerates `assets/icon.ico` (Windows),
+   `assets/OSEF.icns` (macOS; needs `iconutil`, so run it on a Mac) and
+   `src/app/icon_data.inc` (the window icon compiled into the app).
+3. Commit those files, then rebuild (`make -C editor app` on macOS).
+
+The generated files are committed, so Windows and Linux builds and CI need no
+image tools. The Linux release also ships `osef-editor.png` and
+`osef-editor.desktop` for application menus.
+
 ## Command line
 
 ```
