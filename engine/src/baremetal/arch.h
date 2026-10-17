@@ -52,6 +52,10 @@ void acpi_init();
 bool acpi_power_off();
 uint64_t hhdm_offset();
 uintptr_t rsdp_address();
+// Maps physical memory the HHDM does not cover into a kernel window and
+// returns its virtual address. Mappings are permanent.
+void* map_physical(uint64_t phys, uint64_t size, bool uncached);
+void* map_mmio(uint64_t phys, uint64_t size);  // uncached (device registers)
 
 // Milliseconds since the PIT was started (1000 Hz, IRQ0).
 uint64_t ticks_ms();

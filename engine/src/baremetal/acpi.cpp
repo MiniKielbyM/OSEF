@@ -27,21 +27,24 @@ uint8_t checksum(const uint8_t* p, uint32_t length) {
     return sum;
 }
 
-const uint8_t* physical(uint64_t address) {
+// ACPI tables often live in reserved memory that Limine's HHDM does not map,
+// so every access goes through an explicit mapping.
+const uint8_t* physical(uint64_t address, uint64_t length) {
     const uint64_t offset = osef::bm::hhdm_offset();
-    if (!offset) return nullptr;
-    if (address >= offset) return reinterpret_cast<const uint8_t*>(address);
-    if (address > UINT64_MAX - offset) return nullptr;
-    return reinterpret_cast<const uint8_t*>(address + offset);
+    if (offset && address >= offset) address -= offset;  // already an HHDM pointer
+    if (address == 0 || address > 0x000FFFFFFFFFFFFFull) return nullptr;
+    return static_cast<const uint8_t*>(osef::bm::map_physical(address, length, false));
 }
 
 const uint8_t* table(uint64_t address, const char* signature) {
-    const uint8_t* p = physical(address);
+    const uint8_t* p = physical(address, 36);
     if (!p) return nullptr;
     for (size_t i = 0; i < 4; ++i)
         if (p[i] != static_cast<uint8_t>(signature[i])) return nullptr;
     const uint32_t length = read32(p + 4);
-    if (length < 36 || length > kMaxTableLength || checksum(p, length) != 0) return nullptr;
+    if (length < 36 || length > kMaxTableLength) return nullptr;
+    p = physical(address, length);
+    if (!p || checksum(p, length) != 0) return nullptr;
     return p;
 }
 
@@ -92,24 +95,21 @@ bool aml_package_length(const uint8_t* p, const uint8_t* end, uint32_t& length, 
 
 bool find_s5(const uint8_t* aml, uint32_t length, uint8_t& sleep_type_a, uint8_t& sleep_type_b) {
     const uint8_t* const end = aml + length;
-    for (uint32_t i = 0; i + 5 < length; ++i) {
-        if (aml[i] != 0x08 || aml[i + 1] != '_' || aml[i + 2] != 'S' || aml[i + 3] != '5' ||
-            aml[i + 4] != '_')
+    for (uint32_t i = 0; i + 6 < length; ++i) {
+        // NameOp (0x08), an optional root prefix '\\', then the name _S5_.
+        if (aml[i] != 0x08) continue;
+        const uint32_t n = aml[i + 1] == '\\' ? i + 2 : i + 1;
+        if (n + 4 >= length || aml[n] != '_' || aml[n + 1] != 'S' || aml[n + 2] != '5' || aml[n + 3] != '_')
             continue;
-        const uint8_t* pkg = aml + i + 5;
-        uint32_t pkg_len = 0;
-        uint8_t pkg_prefix = 0;
-        if (!aml_package_length(pkg, end, pkg_len, pkg_prefix) ||
-            pkg_len > static_cast<uint32_t>(end - pkg))
-            continue;
-        const uint8_t* const pkg_end = pkg + pkg_len;
-        const uint8_t* body = pkg + pkg_prefix;
-        if (pkg_end - body < 2 || body[0] != 0x12) continue;
+        // DefName := NameOp NameString DataRefObject, here
+        // DefPackage := PackageOp(0x12) PkgLength NumElements PackageElementList.
+        const uint8_t* body = aml + n + 4;
+        if (end - body < 3 || body[0] != 0x12) continue;
 
         uint32_t package_len = 0;
         uint8_t package_prefix = 0;
-        if (!aml_package_length(body + 1, pkg_end, package_len, package_prefix) ||
-            package_len > static_cast<uint32_t>(pkg_end - (body + 1)))
+        if (!aml_package_length(body + 1, end, package_len, package_prefix) ||
+            package_len > static_cast<uint32_t>(end - (body + 1)))
             continue;
         const uint8_t* const package_end = body + 1 + package_len;
         const uint8_t* elements = body + 1 + package_prefix;
@@ -168,7 +168,7 @@ bool find_fadt(const uint8_t* root, uint32_t entry_size) {
 bool discover() {
     const uintptr_t address = osef::bm::rsdp_address();
     if (!address) return false;
-    const uint8_t* rsdp = physical(address);
+    const uint8_t* rsdp = physical(address, 36);
     if (!rsdp) return false;
     constexpr char signature[] = "RSD PTR ";
     for (size_t i = 0; i < 8; ++i)

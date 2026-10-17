@@ -27,6 +27,7 @@ import argparse
 import codecs
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -37,6 +38,8 @@ import threading
 import time
 
 PROMPT = b"\x1b[0m$ "  # end of the OSEF shell prompt: <os>:<cwd>$ (after the color reset)
+# Themed OSes (Appearance colors) follow the reset with their own SGR codes.
+PROMPT_RE = re.compile(rb"\x1b\[0m(?:\x1b\[[0-9;]*m)*\$ ")
 
 
 class Output:
@@ -64,6 +67,8 @@ class Output:
 
     def prompts(self):
         with self.lock:
+            if self.prompt == PROMPT:
+                return len(PROMPT_RE.findall(self.data))
             return self.data.count(self.prompt)
 
     def close(self):
