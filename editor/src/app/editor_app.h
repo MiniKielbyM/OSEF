@@ -80,6 +80,16 @@ private:
     bool quit_confirmed_ = false;
     bool open_quit_prompt_ = false;
     bool open_project_dialog_ = false;
+    bool open_new_os_ = false;
+    bool new_os_folder_edited_ = false;
+    std::string new_os_name_ = "MyOS";
+    std::string new_os_folder_;
+    std::string new_os_error_;
+    int new_os_memory_ = 1;                 // index into {64, 128, 256, 512} MiB
+    int new_os_look_ = 0;
+    bool new_os_uefi_ = true, new_os_screen_ = true, new_os_keyboard_ = true, new_os_serial_ = true,
+         new_os_clock_ = true, new_os_pci_ = false, new_os_samples_ = true;
+    void draw_new_os_dialog();
     bool open_about_ = false;
     bool open_shortcuts_ = false;
     bool open_revert_ = false;

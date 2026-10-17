@@ -13,10 +13,13 @@
 #include "panels/hierarchy_panel.h"
 #include "panels/inspector_panel.h"
 #include "panels/project_panel.h"
+#include "panels/settings_panel.h"
+#include "model/new_project.h"
 #include "text/text_buffer.h"
 
 #include "imgui.h"
 #include "imgui_internal.h"  // DockBuilder, settings handlers, error recovery, sidebars
+#include "misc/cpp/imgui_stdlib.h"
 
 #include <algorithm>
 #include <cmath>
@@ -124,6 +127,7 @@ void center_next_window() {
 
 EditorApp::EditorApp() {
     panels_.push_back(std::make_unique<HierarchyPanel>());
+    panels_.push_back(std::make_unique<SettingsPanel>());
     panels_.push_back(std::make_unique<CodePanel>());
     panels_.back()->visible = false;
     panels_.push_back(std::make_unique<InspectorPanel>());
@@ -312,6 +316,7 @@ void EditorApp::handle_shortcuts() {
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S, global)) save_active();
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Alt | ImGuiKey_S, global)) save_all();
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_O, global)) open_project_dialog_ = true;
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, global)) open_new_os_ = true;
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Q, global)) request_quit();
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_P, global)) start_target("run");
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_B, global)) start_target("iso");
@@ -355,6 +360,7 @@ void EditorApp::draw_menu_bar() {
     const bool running = ctx_.runner.running();
 
     if (ImGui::BeginMenu("File")) {
+        if (ImGui::MenuItem("New OS\xE2\x80\xA6", chord("N").c_str())) open_new_os_ = true;
         if (ImGui::MenuItem("Open Project\xE2\x80\xA6", chord("O").c_str())) open_project_dialog_ = true;
         ImGui::Separator();
         if (ImGui::MenuItem("Save", chord("S").c_str(), false, doc && !doc->read_only())) save_active();
@@ -723,13 +729,11 @@ void EditorApp::build_default_layout(unsigned int dockspace_id, float width, flo
     ImGui::DockBuilderSplitNode(rest, ImGuiDir_Down, 0.26f, &bottom, &top);
     ImGui::DockBuilderSplitNode(top, ImGuiDir_Left, 0.19f / 0.76f, &left, &center);
     ImGui::DockBuilderDockWindow("Hierarchy", left);
+    ImGui::DockBuilderDockWindow("OS Settings", center);
     ImGui::DockBuilderDockWindow("Code", center);
     ImGui::DockBuilderDockWindow("Inspector", right);
     ImGui::DockBuilderDockWindow("Project", bottom);
     ImGui::DockBuilderDockWindow("Console", bottom);
-    // The code panel draws its own document tabs: hide the "Code" dock tab
-    // (a small corner triangle brings it back).
-    if (ImGuiDockNode* c = ImGui::DockBuilderGetNode(center)) c->LocalFlags |= ImGuiDockNodeFlags_HiddenTabBar;
     ImGui::DockBuilderFinish(dockspace_id);
     focus_console_tab_frames_ = 2;
 }
@@ -779,12 +783,122 @@ void EditorApp::draw_panels() {
     if (focus_console_tab_frames_ > 0) {
         if (--focus_console_tab_frames_ == 0) {
             ImGui::SetWindowFocus("Console");
-            ImGui::SetWindowFocus("Code");
+            ImGui::SetWindowFocus(ctx_.beginner_mode ? "OS Settings" : "Code");
         }
     }
 }
 
 // ---- Dialogs -----------------------------------------------------------------------
+
+// File > New OS: a one-page wizard for people who have never written an OS.
+void EditorApp::draw_new_os_dialog() {
+    static const unsigned kMemory[] = {64, 128, 256, 512};
+    if (open_new_os_) {
+        open_new_os_ = false;
+        new_os_error_.clear();
+        if (!new_os_folder_edited_) new_os_folder_ = default_project_folder(new_os_name_).string();
+        ImGui::OpenPopup("Create a New OS");
+    }
+    center_next_window();
+    ImGui::SetNextWindowSize(ImVec2(620.0f, 0.0f), ImGuiCond_Appearing);
+    if (!ImGui::BeginPopupModal("Create a New OS", nullptr, ImGuiWindowFlags_NoSavedSettings)) return;
+
+    const float label_w = 170.0f;
+    auto label = [&](const char* text) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(text);
+        ImGui::SameLine(label_w);
+        ImGui::SetNextItemWidth(-1.0f);
+    };
+    ImGui::TextWrapped("Answer a few questions and OSEF creates a working operating system for you. "
+                       "You can change everything later in OS Settings.");
+    ImGui::Spacing();
+
+    label("1. Name");
+    if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+    if (ImGui::InputText("##new_name", &new_os_name_) && !new_os_folder_edited_)
+        new_os_folder_ = default_project_folder(new_os_name_).string();
+    label("   Saved in");
+    if (ImGui::InputText("##new_folder", &new_os_folder_)) new_os_folder_edited_ = true;
+
+    label("2. Type of PC");
+    if (ImGui::RadioButton("Modern PC (UEFI)", new_os_uefi_)) new_os_uefi_ = true;
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Older PC (BIOS)", !new_os_uefi_)) new_os_uefi_ = false;
+    ImGui::SetCursorPosX(label_w);
+    ImGui::TextDisabled("Not sure? Pick Modern PC: it also works in virtual machines.");
+
+    label("3. Hardware");
+    ImGui::Checkbox("Screen", &new_os_screen_);
+    ImGui::SameLine();
+    ImGui::Checkbox("Keyboard", &new_os_keyboard_);
+    ImGui::SameLine();
+    ImGui::Checkbox("Serial port", &new_os_serial_);
+    ImGui::SameLine();
+    ImGui::Checkbox("Clock", &new_os_clock_);
+    ImGui::SameLine();
+    ImGui::Checkbox("PCI", &new_os_pci_);
+    label("   Memory");
+    static const char* const memory_labels[] = {"64 MiB (tiny)", "128 MiB (recommended)", "256 MiB", "512 MiB"};
+    ImGui::Combo("##new_mem", &new_os_memory_, memory_labels, 4);
+
+    label("4. Look");
+    const auto& looks = look_presets();
+    new_os_look_ = std::clamp(new_os_look_, 0, static_cast<int>(looks.size()) - 1);
+    if (ImGui::BeginCombo("##new_look", looks[static_cast<size_t>(new_os_look_)].name.c_str())) {
+        for (size_t i = 0; i < looks.size(); ++i) {
+            if (ImGui::Selectable(looks[i].name.c_str(), static_cast<int>(i) == new_os_look_))
+                new_os_look_ = static_cast<int>(i);
+            ImGui::SetItemTooltip("%s", looks[i].description.c_str());
+        }
+        ImGui::EndCombo();
+    }
+    label("5. Extras");
+    ImGui::Checkbox("Add a few example programs (hello, a guessing game, a countdown)", &new_os_samples_);
+
+    NewProjectOptions o;
+    o.name = new_os_name_;
+    o.folder = expand_user(new_os_folder_);
+    o.firmware = new_os_uefi_ ? "UEFI" : "BIOS";
+    o.screen = new_os_screen_;
+    o.keyboard = new_os_keyboard_;
+    o.serial = new_os_serial_;
+    o.clock = new_os_clock_;
+    o.pci = new_os_pci_;
+    o.memory_mb = kMemory[std::clamp(new_os_memory_, 0, 3)];
+    o.look = looks[static_cast<size_t>(new_os_look_)].name;
+    o.sample_programs = new_os_samples_;
+
+    const std::vector<std::string> problems = validate_new_project(o);
+    ImGui::Spacing();
+    for (const std::string& p : problems) ImGui::TextColored(theme::color_vec(Color::Warning), "%s", p.c_str());
+    if (!new_os_error_.empty()) ImGui::TextColored(theme::color_vec(Color::Error), "%s", new_os_error_.c_str());
+    ImGui::Separator();
+    ImGui::BeginDisabled(!problems.empty());
+    if (ImGui::Button("Create my OS", ImVec2(160, 0))) {
+        std::string error;
+        const fs::path main = create_new_project(o, &error);
+        if (main.empty()) {
+            new_os_error_ = error;
+        } else if (!ctx_.docs.save_all(&error)) {
+            new_os_error_ = "Could not save open files first: " + error;
+        } else if (!open_project(o.folder, ctx_.engine_root, &error)) {
+            new_os_error_ = error;
+        } else {
+            ctx_.log.info("Created " + o.name + " in " + o.folder.string());
+            ctx_.beginner_mode = true;
+            if (Panel* settings = find_panel("OS Settings")) settings->visible = true;
+            ImGui::SetWindowFocus("OS Settings");
+            new_os_folder_edited_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(110, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+}
+
 
 void EditorApp::draw_dialogs() {
     const ImGuiWindowFlags modal = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings;
@@ -824,6 +938,8 @@ void EditorApp::draw_dialogs() {
             ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
+
+    draw_new_os_dialog();
 
     // File > Open Project.
     if (open_project_dialog_) {
