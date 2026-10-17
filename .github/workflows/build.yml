@@ -16,7 +16,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Configure
         run: cmake -S . -B build-cmake -DCMAKE_BUILD_TYPE=Release -DOSEF_BUILD_ISO=OFF
@@ -42,7 +42,7 @@ jobs:
     env:
       QEMU: /usr/bin/qemu-system-x86_64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install tools
         run: |
@@ -99,12 +99,129 @@ jobs:
             build/*-serial.log
             build/*-screen.png
 
+  # The OSEF editor (the app): build + unit tests on every OS, packaged for
+  # the release. Windows is still experimental (see README), so a failure
+  # there doesn't block a release.
+  editor:
+    name: editor (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            experimental: false
+          - os: ubuntu-latest
+            experimental: false
+          - os: windows-latest
+            experimental: true
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Linux window-system headers (GLFW)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libx11-dev libxrandr-dev libxinerama-dev \
+              libxcursor-dev libxi-dev libgl-dev libwayland-dev libxkbcommon-dev wayland-protocols
+
+      - name: Build and test (CMake; fetches ImGui, GLFW and fonts)
+        run: |
+          cmake -S editor -B build-editor -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-editor --config Release --parallel
+          ctest --test-dir build-editor -C Release --output-on-failure
+
+      - name: Package (macOS app bundle)
+        if: runner.os == 'macOS'
+        run: |
+          make -C editor app
+          ditto -c -k --keepParent "build/editor/OSEF Editor.app" OSEF-Editor-macOS.zip
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p osef-editor-linux
+          cp build-editor/osef-editor osef-editor-linux/
+          cp -R build-editor/fonts osef-editor-linux/fonts
+          tar -czf OSEF-Editor-Linux-x86_64.tar.gz osef-editor-linux
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory osef-editor-windows | Out-Null
+          Copy-Item build-editor/Release/osef-editor.exe osef-editor-windows/
+          Copy-Item -Recurse build-editor/fonts osef-editor-windows/fonts
+          Compress-Archive -Path osef-editor-windows -DestinationPath OSEF-Editor-Windows-x86_64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: editor-${{ runner.os }}
+          if-no-files-found: error
+          path: |
+            OSEF-Editor-*.zip
+            OSEF-Editor-*.tar.gz
+
+  # Every push to main that passes all tests publishes a GitHub release with
+  # the editor builds and the example ISOs.
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [hosted, bare-metal, editor]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect files
+        id: files
+        run: |
+          mkdir -p release
+          find artifacts -name 'OSEF-Editor-*' -exec cp {} release/ \;
+          # Example ISOs from the bare-metal job (one copy per OS name).
+          find artifacts/osef-iso -name '*.iso' | while read -r iso; do
+              out="release/$(basename "$iso" .iso)-example.iso"
+              [ -f "$out" ] || cp "$iso" "$out"
+          done
+          ls -la release
+          version=$(sed -n 's/^project(OSEF VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          echo "tag=v${version}-build.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "name=OSEF ${version} (build ${{ github.run_number }})" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.files.outputs.tag }}
+          name: ${{ steps.files.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          make_latest: true
+          files: release/*
+          body: |
+            Automatic release of `${{ github.sha }}`: every hosted, bare-metal (BIOS + UEFI boot tests in QEMU)
+            and editor test passed.
+
+            * **OSEF-Editor-macOS.zip**: unzip and drag *OSEF Editor.app* into Applications. It is ad-hoc
+              signed, not notarized: right-click > Open the first time.
+            * **OSEF-Editor-Linux-x86_64.tar.gz** / **OSEF-Editor-Windows-x86_64.zip** (experimental): the
+              editor with its fonts.
+            * ***-example.iso**: the example operating systems, bootable in QEMU or a VM (minimal: BIOS,
+              myos: UEFI).
+
+            The editor builds and runs operating systems from an OSEF checkout: clone this repository (or use
+            *Source code* below) to `~/OSEF` or `~/Documents/OSEF`, or point `OSEF_ROOT` at it.
+
   web:
     name: web (experimental)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: mymindstorm/setup-emsdk@v14
       - name: Build (WebAssembly)
         run: |

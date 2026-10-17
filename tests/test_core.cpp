@@ -1391,9 +1391,36 @@ static void check_format(int line, const char* want, int want_len, const char* g
     }
 }
 
+// Whether the host C library is a trustworthy reference for this format.
+// Microsoft's UCRT differs from C99/glibc/BSD in implementation-defined and
+// alternate-form output (%p prints 00007FF6..., some '#' cases differ), so
+// on Windows those conversions are only checked against glibc/BSD in CI.
+static bool host_reference(const char* fmt) {
+#if defined(_WIN32)
+    for (const char* p = fmt; *p; ++p) {
+        if (*p != '%') continue;
+        if (p[1] == '%') {
+            ++p;
+            continue;
+        }
+        for (const char* q = p + 1; *q; ++q) {
+            if (*q == '#') return false;
+            if (*q == 'p') return false;
+            if ((*q >= 'a' && *q <= 'z' && *q != 'h' && *q != 'l' && *q != 'j' && *q != 'z' && *q != 't') ||
+                (*q >= 'A' && *q <= 'Z' && *q != 'L'))
+                break;
+        }
+    }
+#else
+    (void)fmt;
+#endif
+    return true;
+}
+static const char* format_of(const char* fmt, ...) { return fmt; }
+
 // Formats with the host snprintf and osef::format_to, osef::format, compares.
 #define FMT(...)                                                                 \
-    do {                                                                         \
+    if (host_reference(format_of(__VA_ARGS__))) do {                             \
         char want_[512];                                                         \
         char got_[512];                                                          \
         const int wl_ = std::snprintf(want_, sizeof want_, __VA_ARGS__);         \
@@ -1410,7 +1437,7 @@ static void check_format(int line, const char* want, int want_len, const char* g
 // Truncated output into an n-byte buffer: same bytes, same return value,
 // nothing written past n.
 #define FMT_N(n, ...)                                                            \
-    do {                                                                         \
+    if (host_reference(format_of(__VA_ARGS__))) do {                             \
         char want_[64];                                                          \
         char got_[64];                                                           \
         std::memset(want_, '#', sizeof want_);                                   \

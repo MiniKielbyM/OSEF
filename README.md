@@ -151,7 +151,13 @@ CI ([.github/workflows/build.yml](.github/workflows/build.yml)) builds and tests
 the hosted engine on Linux, macOS and Windows. A bare-metal job on Linux
 (clang, lld, xorriso, QEMU, OVMF) builds the ISOs with CMake and with the
 Makefile and boots them in QEMU. It also builds the WebAssembly target
-(experimental).
+(experimental) and the editor on all three systems.
+
+**Releases:** every push to `main` that passes all of these jobs publishes a
+GitHub release (`v<version>-build.<run>`). It contains the editor for macOS
+(`OSEF Editor.app`, zipped), Linux and Windows (experimental), plus the example
+ISOs. A downloaded editor finds the OSEF folder through `--root`, the
+`OSEF_ROOT` environment variable, or a checkout at `~/OSEF` or `~/Documents/OSEF`.
 
 ## Building the app on each operating system
 

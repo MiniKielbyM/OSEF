@@ -240,6 +240,12 @@ fs::path detect_root(const Options& opt, const fs::path& exe) {
     if (!opt.root.empty()) return fs::weakly_canonical(fs::absolute(opt.root, ec), ec);
     if (fs::path r = find_root_upward(opt.project); !r.empty()) return r;
     if (fs::path r = find_root_upward(exe.parent_path()); !r.empty()) return r;
+    // $OSEF_ROOT: where the OSEF checkout is (for a downloaded / installed app).
+    if (const char* env = std::getenv("OSEF_ROOT"); env && *env && fs::is_regular_file(fs::path(env) / kHardwareHeader, ec))
+        return fs::weakly_canonical(fs::path(env), ec);
+    for (const char* home_rel : {"OSEF", "Documents/OSEF", "Developer/OSEF", "src/OSEF"})
+        if (const char* home = std::getenv("HOME"); home && fs::is_regular_file(fs::path(home) / home_rel / kHardwareHeader, ec))
+            return fs::path(home) / home_rel;
     if (*OSEF_ROOT_DIR && fs::is_regular_file(fs::path(OSEF_ROOT_DIR) / kHardwareHeader, ec)) return OSEF_ROOT_DIR;
     return find_root_upward(fs::current_path(ec));
 }
