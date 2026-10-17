@@ -43,6 +43,8 @@ public:
     }
 
     void write(StringView text) override { bm::console_write(text.data(), text.size()); }
+    void set_console_colors(int fg, int bg) override { bm::console_set_colors(fg, bg); }
+    void set_console_scale(int scale) override { bm::console_set_scale(scale); }
 
     bool poll_line(String& out) override {
         char c;

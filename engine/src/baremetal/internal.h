@@ -82,6 +82,8 @@ bool keyboard_getc(char& c);
 
 bool fbcon_init(const limine_framebuffer* fb);  // false if unsupported format
 bool fbcon_active();
+void fbcon_set_default_colors(int fg, int bg);
+void fbcon_set_scale(uint32_t scale);  // 1-4: 8x8 font scaled; clears the screen  // ANSI 0-15, -1 = unchanged
 void fbcon_write(const char* s, size_t n);
 
 // ---- memory / runtime ------------------------------------------------------

@@ -19,8 +19,9 @@ constexpr Rgb kPalette[16] = {
     {85, 85, 85},    {255, 85, 85},   {85, 255, 85},   {255, 255, 85},
     {85, 85, 255},   {255, 85, 255},  {85, 255, 255},  {255, 255, 255},
 };
-constexpr int kDefaultFg = 7;
-constexpr int kDefaultBg = 0;
+// Defaults ("reset" colors); the OS's Appearance can change them.
+int kDefaultFg = 7;
+int kDefaultBg = 0;
 
 struct Console {
     bool active = false;
@@ -311,6 +312,26 @@ bool fbcon_init(const limine_framebuffer* fb) {
     g_con.active = true;
     show_cursor();
     return true;
+}
+
+void fbcon_set_scale(uint32_t scale) {
+    if (!g_con.active || scale < 1 || scale > 4) return;
+    hide_cursor();
+    g_con.scale = scale;
+    g_con.cell = 8 * scale;
+    g_con.cols = static_cast<uint32_t>(g_con.width / g_con.cell);
+    g_con.rows = static_cast<uint32_t>(g_con.height / g_con.cell);
+    g_con.cx = g_con.cy = 0;
+    fill_rect(0, 0, g_con.width, g_con.height, g_con.pixel[g_con.bg]);
+    show_cursor();
+}
+
+void fbcon_set_default_colors(int fg, int bg) {
+    if (fg >= 0 && fg < 16) kDefaultFg = fg;
+    if (bg >= 0 && bg < 16) kDefaultBg = bg;
+    g_con.fg = kDefaultFg;
+    g_con.bg = kDefaultBg;
+    g_con.bold = false;
 }
 
 bool fbcon_active() { return g_con.active; }

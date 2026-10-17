@@ -15,6 +15,8 @@ the path of a QMP unix socket created by this script, so the command can pass
                   the last line the script waits for the VM to exit.
                   "@raw <text>" types <text> with Python escapes decoded
                   (e.g. "@raw echo a\\x1b[Db" sends an arrow-key sequence).
+--prompt TEXT     what the end of a shell prompt looks like (Python escapes),
+                  for OSes with a custom Appearance::prompt.
 --observe S       type nothing: watch the boot for S seconds (or until the
                   VM exits), take the screenshot, then stop the VM.
 
@@ -38,7 +40,8 @@ PROMPT = b"\x1b[0m$ "  # end of the OSEF shell prompt: <os>:<cwd>$ (after the co
 
 
 class Output:
-    def __init__(self, stream, log_path):
+    def __init__(self, stream, log_path, prompt=PROMPT):
+        self.prompt = prompt
         self.data = bytearray()
         self.lock = threading.Lock()
         self.log = open(log_path, "wb")
@@ -61,7 +64,7 @@ class Output:
 
     def prompts(self):
         with self.lock:
-            return self.data.count(PROMPT)
+            return self.data.count(self.prompt)
 
     def close(self):
         self.thread.join(timeout=5)
@@ -107,6 +110,7 @@ def main():
     ap.add_argument("--screenshot")
     ap.add_argument("--timeout", type=float, default=90.0)
     ap.add_argument("--step-timeout", type=float, default=30.0)
+    ap.add_argument("--prompt", help="text that ends a shell prompt (Python escapes; default: the OSEF shell's)")
     group = ap.add_mutually_exclusive_group(required=True)
     group.add_argument("--commands")
     group.add_argument("--observe", type=float)
@@ -128,7 +132,8 @@ def main():
     start = time.time()
     # Own process group, so a kill also reaches QEMU when the command is osef-image.
     proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True)
-    out = Output(proc.stdout, args.log)
+    prompt = codecs.decode(args.prompt, "unicode_escape").encode("latin-1") if args.prompt else PROMPT
+    out = Output(proc.stdout, args.log, prompt)
     killed = False
 
     def remaining():

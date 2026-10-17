@@ -69,6 +69,13 @@ public:
     }
     [[noreturn]] void fault(StringView message) override { throw ProcessFault(message); }
 
+    void set_console_colors(int fg, int bg) override {
+        console_fg = fg;
+        console_bg = bg;
+    }
+    void set_console_scale(int scale) override { console_scale = scale; }
+    int console_fg = -2, console_bg = -2, console_scale = 0;
+
     void advance(uint64_t ms) { clock_ += ms; }
     void set_memory(MemoryStats m) { memory_ = m; }
     int shutdown_calls() const { return shutdown_calls_; }
@@ -383,11 +390,94 @@ static void test_lottery_scheduler() {
     CHECK(hi > 2 * lo);
 }
 
+
+// Appearance: welcome text, prompt template + colors, console defaults.
+static void test_appearance() {
+    KernelConfig cfg;
+    cfg.appearance.welcome = "Hi there";
+    cfg.appearance.prompt = "<{os}@{cwd}> ";
+    cfg.appearance.text = ConsoleColor::BrightYellow;
+    cfg.appearance.background = ConsoleColor::Blue;
+    cfg.appearance.prompt_name = ConsoleColor::BrightRed;
+    cfg.appearance.prompt_path = ConsoleColor::Default;
+    cfg.appearance.text_size = 2;
+    Harness h({"exit"}, osef::move(cfg));
+    h.kernel->add_module<ShellModule>();
+    CHECK(h.run() >= 0);
+    CHECK(h.has("Hi there\n"));
+    const String reset = "\x1b[0m\x1b[93m\x1b[44m";
+    CHECK(h.kernel->style_reset() == reset);
+    CHECK(h.has("<\x1b[1m\x1b[91mTestOS" + reset + "@/> "));  // {cwd} uncolored (Default)
+    CHECK(h.has(reset + "\x1b[2J\x1b[H"));                     // background clears the screen
+    CHECK(h.platform->console_fg == 11);
+    CHECK(h.platform->console_bg == 4);
+    CHECK(h.platform->console_scale == 2);
+    CHECK(Kernel::color_code(ConsoleColor::Default).empty());
+    CHECK(Kernel::color_code(ConsoleColor::Green) == "\x1b[32m");
+    CHECK(Kernel::color_code(ConsoleColor::BrightBlue, true) == "\x1b[104m");
+    CHECK(StringView(to_string(ConsoleColor::BrightCyan)) == "bright-cyan");
+}
+
+// The default appearance keeps the classic prompt and leaves the console alone.
+static void test_default_appearance() {
+    Harness h({"exit"});
+    h.kernel->add_module<ShellModule>();
+    CHECK(h.run() >= 0);
+    CHECK(h.has("\x1b[1m\x1b[92mTestOS\x1b[0m:\x1b[1m\x1b[94m/\x1b[0m$ "));
+    CHECK(!h.has("\x1b[2J"));
+    CHECK(h.platform->console_scale == 0);
+    CHECK(h.platform->console_fg == -1 && h.platform->console_bg == -1);
+}
+
+// Modules added before boot can configure the kernel (on_configure).
+struct ConfigureModule final : Module {
+    const char* name() const override { return "configure"; }
+    void on_configure(KernelConfig& config) override {
+        config.os_name = "Configured";
+        config.appearance.welcome = "configured welcome";
+    }
+};
+
+static void test_on_configure() {
+    Harness h({"uname", "exit"}, {}, /*banner=*/true);
+    h.kernel->add_module<ConfigureModule>();
+    h.kernel->add_module<ShellModule>();
+    CHECK(h.run() >= 0);
+    CHECK(h.has("Configured 0.1.0"));
+    CHECK(h.has("configured welcome"));
+}
+
+// OSEF_AUTO_MODULE: every Kernel gets the module without a line in main().
+static int g_auto_loads = 0;
+struct AutoTestModule final : Module {
+    const char* name() const override { return "auto-test"; }
+    void on_load(Kernel&) override { ++g_auto_loads; }
+};
+OSEF_AUTO_MODULE(AutoTestModule);
+
+static void test_auto_module() {
+    const int before = g_auto_loads;
+    Harness h({"exit"});
+    CHECK(h.kernel->find_module<AutoTestModule>() != nullptr);
+    CHECK(h.kernel->modules().size() >= 1 && h.kernel->modules()[0]->type() == type_id<AutoTestModule>());
+    h.kernel->add_module<ShellModule>();
+    CHECK(h.run() >= 0);
+    CHECK(g_auto_loads == before + 1);
+    bool found = false;
+    for (const AutoModule* m = auto_modules(); m; m = m->next)
+        if (m->type == type_id<AutoTestModule>()) found = true;
+    CHECK(found);
+}
+
 int main() {
     struct {
         const char* name;
         void (*fn)();
     } tests[] = {
+        {"appearance", test_appearance},
+        {"default_appearance", test_default_appearance},
+        {"on_configure", test_on_configure},
+        {"auto_module", test_auto_module},
         {"paths", test_paths},
         {"shell_and_vfs", test_shell_and_vfs},
         {"programs_sleep_and_wait", test_programs_sleep_and_wait},

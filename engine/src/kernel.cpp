@@ -105,10 +105,53 @@ Kernel::Kernel(KernelConfig config, UniquePtr<Platform> platform)
       platform_(platform ? osef::move(platform) : create_default_platform()),
       scheduler_(make_unique<RoundRobinScheduler>()),
       devfs_(make_shared<DevFS>()) {
+    register_builtins();
+    // Self-registered modules (OSEF_AUTO_MODULE) come first; their
+    // on_configure() may change the configuration.
+    for (const AutoModule* m = auto_modules(); m; m = m->next) {
+        UniquePtr<Module> mod = m->create();
+        if (!mod) continue;
+        mod->type_ = m->type;
+        attach_module(osef::move(mod));
+    }
+    normalize_config();
+}
+
+void Kernel::normalize_config() {
     if (config_.os_name.empty()) config_.os_name = hardware().name;
     if (config_.tick_hz == 0) config_.tick_hz = 1;
     if (config_.quanta_per_tick == 0) config_.quanta_per_tick = 1;
-    register_builtins();
+}
+
+namespace {
+AutoModule* g_auto_head = nullptr;
+AutoModule* g_auto_tail = nullptr;
+} // namespace
+
+void register_auto_module(AutoModule& module) {
+    for (AutoModule* m = g_auto_head; m; m = m->next)
+        if (m == &module) return;
+    module.next = nullptr;
+    if (g_auto_tail) g_auto_tail->next = &module;
+    else g_auto_head = &module;
+    g_auto_tail = &module;
+}
+
+const AutoModule* auto_modules() { return g_auto_head; }
+
+const char* to_string(ConsoleColor color) {
+    static const char* const names[] = {"black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+                                        "bright-black", "bright-red", "bright-green", "bright-yellow",
+                                        "bright-blue", "bright-magenta", "bright-cyan", "bright-white"};
+    const int i = static_cast<int>(color);
+    return i >= 0 && i < 16 ? names[i] : "default";
+}
+
+String Kernel::color_code(ConsoleColor color, bool background) {
+    const int c = static_cast<int>(color);
+    if (c < 0 || c > 15) return String();
+    const int base = c < 8 ? (background ? 40 : 30) : (background ? 100 : 90);
+    return "\x1b[" + to_string(base + c % 8) + "m";
 }
 
 Kernel::~Kernel() {
@@ -171,7 +214,8 @@ void Kernel::register_builtins() {
 void Kernel::attach_module(UniquePtr<Module> mod) {
     Module& ref = *mod;
     modules_.push_back(osef::move(mod));
-    // Modules added before boot are loaded during boot.
+    // Modules added before boot get to configure the kernel, and are loaded during boot.
+    if (!booted_) ref.on_configure(config_);
     if (booted_ && !halted_) {
         log(LogLevel::Debug, String("module loaded: ") + ref.name());
         ref.on_load(*this);
@@ -270,15 +314,28 @@ void Kernel::shutdown(int exit_code) {
 
 // ---------------------------------------------------------------- lifecycle
 
+void Kernel::apply_appearance() {
+    const Appearance& a = config_.appearance;
+    platform_->set_console_colors(static_cast<int>(a.text), static_cast<int>(a.background));
+    if (a.text_size >= 1 && a.text_size <= 4) platform_->set_console_scale(a.text_size);
+    // Consoles that cannot change their defaults (terminals) get the colors
+    // re-applied after every reset.
+    style_reset_ = "\x1b[0m" + color_code(a.text) + color_code(a.background, true);
+    if (a.background != ConsoleColor::Default || a.clear_screen) print(style_reset_ + "\x1b[2J\x1b[H");
+    else if (a.text != ConsoleColor::Default) print(style_reset_);
+}
+
 void Kernel::boot() {
     if (booted_) return;
     platform_->init(hardware());
     boot_time_ = platform_->now_ms();
     running_ = true;
+    normalize_config();
+    apply_appearance();
 
     if (config_.show_banner) {
-        print("\x1b[1m" + config_.os_name + " " + config_.version + "\x1b[0m  (OSEF engine on " + platform_->name() +
-              ", " + platform_->firmware() + " boot)\n");
+        print("\x1b[1m" + config_.os_name + " " + config_.version + style_reset_ + "  (OSEF engine on " +
+              platform_->name() + ", " + platform_->firmware() + " boot)\n");
     }
 
     if (!vfs_.has_mount("/")) vfs_.mount("/", make_shared<RamFS>());

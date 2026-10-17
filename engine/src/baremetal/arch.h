@@ -39,6 +39,8 @@ struct PciInfo {
 // 49/90-97/100-107, ESC[2J, ESC[H / ESC[r;cH, ESC[K, ESC[nA/B/C/D).
 void console_write(const char* s, size_t n);
 void console_write(const char* s);  // NUL-terminated convenience overload
+void console_set_scale(int scale);      // framebuffer font scale 1-4 (clears the screen)
+void console_set_colors(int fg, int bg); // framebuffer default colors (ANSI 0-15, -1 = unchanged)
 
 // Next decoded input character from the PS/2 keyboard and COM1 ring buffers
 // (keyboard first). Enter / CR -> '\n', Backspace / DEL -> '\b', Ctrl+<letter>

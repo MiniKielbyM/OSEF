@@ -65,6 +65,12 @@ public:
 
     // Console output.
     virtual void write(StringView text) = 0;
+    // The console's default colors (ANSI color numbers 0-15; -1 = unchanged),
+    // i.e. what "reset" returns to. Terminals can't change theirs; the bare-metal
+    // framebuffer console can.
+    virtual void set_console_colors(int /*fg*/, int /*bg*/) {}
+    // Text size on graphical consoles (1-4 = font scale); terminals ignore it.
+    virtual void set_console_scale(int /*scale*/) {}
 
     // Non-blocking line input. Returns true and fills `out` if a full line
     // is available. Must never block.

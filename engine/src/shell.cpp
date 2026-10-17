@@ -297,13 +297,40 @@ const Vector<Builtin>& builtins() {
 class Shell final : public Process {
 public:
     void on_start(Context& c) override {
+        const String& welcome = c.kernel().config().appearance.welcome;
+        if (!welcome.empty()) c.print(welcome.ends_with('\n') ? welcome : welcome + "\n");
         String motd;
         if (c.fs().read("/etc/motd", motd)) c.print(motd);
     }
 
+    // The appearance's prompt template with {os} and {cwd} filled in and colored.
+    static String prompt(Context& c) {
+        const Kernel& k = c.kernel();
+        const Appearance& a = k.config().appearance;
+        const String& reset = k.style_reset();
+        auto colored = [&](ConsoleColor color, StringView text) {
+            String code = Kernel::color_code(color);
+            return code.empty() ? String(text) : "\x1b[1m" + code + text + reset;
+        };
+        String out;
+        StringView t = a.prompt;
+        for (size_t i = 0; i < t.size();) {
+            if (t.substr(i).starts_with("{os}")) {
+                out += colored(a.prompt_name, k.config().os_name);
+                i += 4;
+            } else if (t.substr(i).starts_with("{cwd}")) {
+                out += colored(a.prompt_path, c.cwd());
+                i += 5;
+            } else {
+                out += t[i++];
+            }
+        }
+        return out;
+    }
+
     void step(Context& c) override {
         if (show_prompt_) {
-            c.print("\x1b[1;32m" + c.kernel().config().os_name + "\x1b[0m:\x1b[1;34m" + c.cwd() + "\x1b[0m$ ");
+            c.print(prompt(c));
             show_prompt_ = false;
         }
         String line;

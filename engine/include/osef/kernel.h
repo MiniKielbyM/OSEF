@@ -17,6 +17,26 @@ namespace osef {
 
 enum class LogLevel { Debug = 0, Info, Warn, Error, None };
 
+// The 16 classic console colors (ANSI/VGA). Default keeps the console's own.
+enum class ConsoleColor : int8_t {
+    Default = -1,
+    Black, Red, Green, Yellow, Blue, Magenta, Cyan, White,
+    BrightBlack, BrightRed, BrightGreen, BrightYellow, BrightBlue, BrightMagenta, BrightCyan, BrightWhite,
+};
+const char* to_string(ConsoleColor color);
+
+// How the OS looks on its console. All of it can be set from the OSEF editor.
+struct Appearance {
+    String welcome;                         // printed when the shell starts (before /etc/motd)
+    String prompt = "{os}:{cwd}$ ";         // shell prompt; {os} and {cwd} are replaced
+    ConsoleColor text = ConsoleColor::Default;        // default text color
+    ConsoleColor background = ConsoleColor::Default;  // screen background
+    ConsoleColor prompt_name = ConsoleColor::BrightGreen;  // color of {os} in the prompt
+    ConsoleColor prompt_path = ConsoleColor::BrightBlue;   // color of {cwd} in the prompt
+    bool clear_screen = false;              // clear the screen at boot (implied by a background color)
+    int text_size = 0;                      // screen font scale 1-4; 0 = automatic
+};
+
 struct KernelConfig {
     String os_name;                       // empty: use the OSEF_HARDWARE .name()
     String version = "0.1.0";
@@ -27,6 +47,7 @@ struct KernelConfig {
     LogLevel log_level = LogLevel::Info;
     bool show_banner = true;
     bool mount_devfs = true;              // mount built-in devices at /dev
+    Appearance appearance;
 };
 
 struct SpawnOptions {
@@ -124,6 +145,11 @@ public:
 
     // ---- Subsystems ----
     const KernelConfig& config() const { return config_; }
+    // ANSI sequence that resets text attributes to the OS's appearance colors.
+    // Use it instead of "\x1b[0m" in OS output so themed colors stick.
+    const String& style_reset() const { return style_reset_; }
+    // ANSI sequence selecting `color` as the foreground ("" for Default).
+    static String color_code(ConsoleColor color, bool background = false);
     const HardwareSpec& hardware() const { return osef::hardware(); }
     Platform& platform() { return *platform_; }
     VFS& vfs() { return vfs_; }
@@ -161,6 +187,8 @@ private:
     friend class Context;
 
     void attach_module(UniquePtr<Module> mod);
+    void normalize_config();
+    void apply_appearance();
     void register_builtins();
     void wake_processes();
     void run_quantum(Process& proc);
@@ -169,6 +197,7 @@ private:
     Process* find(Pid pid) const;
 
     KernelConfig config_;
+    String style_reset_ = "\x1b[0m";
     UniquePtr<Platform> platform_;
     UniquePtr<Scheduler> scheduler_;
     SharedPtr<DevFS> devfs_;

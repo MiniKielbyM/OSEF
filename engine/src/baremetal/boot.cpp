@@ -88,6 +88,14 @@ const limine_framebuffer* boot_framebuffer() {
 bool console_serial_enabled() { return g_serial_console; }
 bool console_fb_enabled() { return g_fb_console; }
 
+void console_set_scale(int scale) {
+    if (fbcon_active() && scale >= 1) fbcon_set_scale(static_cast<uint32_t>(scale));
+}
+
+void console_set_colors(int fg, int bg) {
+    if (fbcon_active()) fbcon_set_default_colors(fg, bg);
+}
+
 void console_write(const char* s, size_t n) {
     if (!s || n == 0) return;
     if (g_serial_console) serial_write(s, n);
