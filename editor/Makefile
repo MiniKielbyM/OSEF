@@ -168,9 +168,18 @@ ICNS        := $(BUILD)/OSEF.icns
 INSTALL_DIR ?= $(shell if [ -w /Applications ]; then echo /Applications; else echo "$$HOME/Applications"; fi)
 
 ifeq ($(UNAME_S),Darwin)
+# App icon: editor/macos/OSEF.icns if you provide one, else the built-in icon
+# (window_icon.cpp) rendered at 16-1024 px and packed with iconutil.
+CUSTOM_ICNS := $(wildcard $(EDITOR_DIR)/macos/OSEF.icns)
+ifneq ($(CUSTOM_ICNS),)
+$(ICNS): $(CUSTOM_ICNS)
+	@echo "  ICON  $@ (from editor/macos/OSEF.icns)"
+	$(Q)cp "$<" "$@"
+else
 $(ICNS): $(BIN)
-	@echo "  ICON  $@"
+	@echo "  ICON  $@ (generated)"
 	$(Q)rm -rf "$(ICONSET)" && $(BIN) --write-iconset "$(ICONSET)" && iconutil -c icns "$(ICONSET)" -o "$@"
+endif
 
 app: all $(ICNS) $(EDITOR_DIR)/macos/Info.plist.in
 	@echo "  APP   $(APP)"
