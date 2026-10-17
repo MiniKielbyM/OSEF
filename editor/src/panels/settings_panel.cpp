@@ -345,6 +345,7 @@ void hardware_section(EditorContext& ctx) {
         {"hw.serial", "Serial UART (COM1)", "16550 UART at 0x3F8, IRQ 4 (Hw::Serial). Console I/O and debugging; QEMU -serial stdio."},
         {"hw.rtc", "CMOS RTC", "MC146818-compatible real-time clock, wall-clock date/time (Hw::RTC)."},
         {"hw.pci", "PCI enumeration", "Configuration-space scan via ports 0xCF8/0xCFC (Hw::PCI); see the lspci command."},
+        {"hw.usb", "USB (xHCI)", "xHCI host controller: device enumeration (lsusb) and HID boot keyboards (Hw::USB)."},
     };
     bool changed = false;
     for (const Dev& d : devices) {
@@ -360,7 +361,7 @@ void hardware_section(EditorContext& ctx) {
         hint(d.help);
     }
     ImGui::BeginDisabled();
-    for (const char* planned : {"PS/2 mouse (IRQ 12)", "USB (xHCI)", "Storage (AHCI / NVMe)", "Network (virtio-net / e1000)", "Audio (Intel HDA)"}) {
+    for (const char* planned : {"PS/2 mouse (IRQ 12)", "USB mouse / mass storage", "Storage (AHCI / NVMe)", "Network (virtio-net / e1000)", "Audio (Intel HDA)"}) {
         bool off = false;
         ImGui::Checkbox(planned, &off);
         ImGui::SameLine(label_width());

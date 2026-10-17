@@ -422,19 +422,19 @@ TEST(project_driver_stub_written_once) {
     REQUIRE(o->project);
     Project& p = *o->project;
     std::string error;
-    fs::path path = p.create_driver_stub(*p.find("hw.usb"), &error);
+    fs::path path = p.create_driver_stub(*p.find("hw.mouse"), &error);
     REQUIRE(!path.empty());
     CHECK(error.empty());
-    CHECK(fs::equivalent(path, dir / "drivers" / "usb.cpp"));
+    CHECK(fs::equivalent(path, dir / "drivers" / "mouse.cpp"));
     const std::string text = read_file(path);
     CHECK(text.find("#include <osef/osef.h>") != std::string::npos);
-    CHECK(text.find("class UsbModule final : public osef::Module") != std::string::npos);
-    CHECK(text.find("const char* name() const override { return \"usb\"; }") != std::string::npos);
-    CHECK(text.find("kernel.log(osef::LogLevel::Info, \"usb: ") != std::string::npos);
-    CHECK(text.find("kernel.register_device(\"usb0\", {\"USB (stub)\", nullptr, nullptr});") != std::string::npos);
+    CHECK(text.find("class MouseModule final : public osef::Module") != std::string::npos);
+    CHECK(text.find("const char* name() const override { return \"mouse\"; }") != std::string::npos);
+    CHECK(text.find("kernel.log(osef::LogLevel::Info, \"mouse: ") != std::string::npos);
+    CHECK(text.find("kernel.register_device(\"mouse0\", {\"Mouse (stub)\", nullptr, nullptr});") != std::string::npos);
     CHECK(text.find("void on_tick(osef::Kernel&") != std::string::npos);
-    CHECK(text.find("kernel.add_module<drivers::UsbModule>()") != std::string::npos);
-    CHECK(text.find("xHCI") != std::string::npos);  // from the component's description
+    CHECK(text.find("kernel.add_module<drivers::MouseModule>()") != std::string::npos);
+    CHECK(text.find("PS/2") != std::string::npos);  // from the component's description
     CHECK(text.find("std::") == std::string::npos);
     // Every comment line fits in 80 columns.
     size_t start = 0;
@@ -448,7 +448,7 @@ TEST(project_driver_stub_written_once) {
     // Never overwritten.
     write_file(path, "// my edits\n");
     error.clear();
-    CHECK(p.create_driver_stub(*p.find("hw.usb"), &error).empty());
+    CHECK(p.create_driver_stub(*p.find("hw.mouse"), &error).empty());
     CHECK(error.find("already exists") != std::string::npos);
     CHECK_EQ(read_file(path), std::string("// my edits\n"));
 

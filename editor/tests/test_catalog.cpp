@@ -39,7 +39,7 @@ const Expected kTable[] = {
     {"hw.display", "Display", ComponentKind::Display, ComponentStatus::Implemented},
     {"hw.keyboard", "Keyboard", ComponentKind::Keyboard, ComponentStatus::Implemented},
     {"hw.mouse", "Mouse", ComponentKind::Mouse, ComponentStatus::Planned},
-    {"hw.usb", "USB", ComponentKind::Usb, ComponentStatus::Planned},
+    {"hw.usb", "USB", ComponentKind::Usb, ComponentStatus::Partial},
     {"hw.storage", "Storage", ComponentKind::Storage, ComponentStatus::Planned},
     {"hw.pci", "PCI", ComponentKind::Pci, ComponentStatus::Implemented},
     {"hw.network", "Network", ComponentKind::Network, ComponentStatus::Planned},
@@ -189,7 +189,7 @@ TEST(catalog_device_toggles) {
             CHECK(!c.toggle_tooltip.empty());
         }
     });
-    CHECK(toggles == (std::set<std::string>{"hw.serial", "hw.display", "hw.keyboard", "hw.rtc", "hw.pci"}));
+    CHECK(toggles == (std::set<std::string>{"hw.serial", "hw.display", "hw.keyboard", "hw.rtc", "hw.pci", "hw.usb"}));
 }
 
 TEST(catalog_engine_sources_exist_on_disk) {

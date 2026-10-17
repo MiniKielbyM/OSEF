@@ -238,6 +238,11 @@ std::unique_ptr<Component> interrupts() {
                   "invalid opcode or divide error inside a process becomes a readable message (\"page fault at "
                   "0x... rip=0x...\"), the kernel kills that process and keeps running. Exceptions outside a "
                   "process, or inside an IRQ handler, show the panic screen with all registers.\n\n"
+                  "Custom interrupts: kernel.interrupts().on_irq(n, ...) hooks IRQ line n (vector 32+n, next to the "
+                  "engine's own drivers) and on_vector(v, ...) claims OS vector 0x30-0xFF. Interrupts are counted "
+                  "in interrupt context and the handlers run deferred in kernel context, fault-isolated. "
+                  "kernel.interrupts().raise(v) (or the `int` command) raises a software interrupt; `irq` lists "
+                  "handlers and counts. Add handlers without code in OS Settings > Interrupts.\n\n"
                   "The local APIC and I/O APIC (needed for SMP and for routing PCI interrupts) are planned.");
     c->properties.push_back(info("controller", "Controller", "8259 PIC remapped to vectors 32-47", kDriver));
     c->properties.push_back(info("exceptions", "Exceptions", "isolated per process", kDriver,
@@ -390,20 +395,28 @@ std::unique_ptr<Component> mouse() {
 }
 
 std::unique_ptr<Component> usb() {
-    auto c = make("hw.usb", "USB", ComponentKind::Usb, ComponentStatus::Planned,
-                  "xHCI host controller and USB class drivers",
-                  "Not in the engine yet, and it needs the PCI component first. Find the xHCI controller by PCI "
-                  "class 0x0C, subclass 0x03, prog-if 0x30, enable bus mastering and memory decoding, and map BAR0 "
-                  "(MMIO is not in Limine's HHDM in base revision 3). Then follow the xHCI specification (Intel, "
-                  "rev. 1.2): take ownership from the firmware (USB legacy support capability), reset the "
-                  "controller, set up the device context base address array, the command ring and an event ring "
-                  "(with interrupts via MSI/MSI-X or polling), then enumerate the root hub ports: reset, Enable "
-                  "Slot, Address Device, and read descriptors.\n\n"
-                  "Class drivers on top: HID boot protocol keyboard and mouse (USB HID 1.11), and mass storage "
-                  "bulk-only transport with SCSI commands (USB MSC BOT 1.0). UEFI firmware often emulates PS/2 for "
-                  "USB keyboards until an OS takes over the controller.");
-    c->properties.push_back(info("host_controller", "Host controller", "xHCI", kPlanned));
-    c->properties.push_back(info("classes", "Classes", "HID keyboard/mouse, mass storage (needs PCI)", kPlanned));
+    auto c = make("hw.usb", "USB", ComponentKind::Usb, ComponentStatus::Partial,
+                  "xHCI host controller, device enumeration, HID boot keyboards",
+                  "usb.cpp drives an xHCI controller (PCI class 0x0C/0x03, prog-if 0x30): it enables memory decoding "
+                  "and bus mastering, maps BAR0 through the kernel's MMIO window (vmm.cpp; MMIO is not in Limine's "
+                  "HHDM), takes the controller from the firmware via the USB legacy support capability, resets it, "
+                  "and sets up the device context base address array, scratchpad buffers, a command ring and one "
+                  "event ring (polled; interrupter 0 has IE cleared).\n\n"
+                  "Each connected root-hub port is reset, gets a slot (Enable Slot), an address (Address Device, "
+                  "EP0 max packet fixed up with Evaluate Context) and is described from its device, configuration "
+                  "and string descriptors: `lsusb` lists vendor/product ids, names, class and speed.\n\n"
+                  "HID boot-protocol keyboards are configured (SET_CONFIGURATION, SET_PROTOCOL boot, Configure "
+                  "Endpoint for the interrupt IN endpoint); their 8-byte reports become console input next to "
+                  "PS/2 and serial, so a machine with only a USB keyboard works.\n\n"
+                  "Not yet: external hubs, mice, mass storage (bulk-only transport), MSI-X interrupts and hot plug "
+                  "after boot. In QEMU, `make run-iso` adds -device qemu-xhci with usb-kbd and usb-tablet.");
+    make_device_toggle(*c, "USB");
+    c->properties.push_back(info("host_controller", "Host controller", "xHCI 1.x (polled event ring)", kDriver));
+    c->properties.push_back(info("classes", "Class drivers", "HID boot keyboard (console input)", kDriver));
+    c->properties.push_back(info("command", "Try it", "lsusb", kDriver));
+    c->properties.push_back(info("planned", "Planned", "hubs, HID mouse, mass storage, MSI-X, hot plug", kPlanned));
+    c->sources.push_back(engine("engine/src/baremetal/usb.cpp", "xHCI driver"));
+    c->sources.push_back(engine("engine/src/baremetal/vmm.cpp", "MMIO mapping"));
     return c;
 }
 

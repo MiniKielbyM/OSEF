@@ -72,6 +72,7 @@ std::string new_project_main(const NewProjectOptions& o) {
     d.ps2_keyboard = o.keyboard;
     d.rtc = o.clock;
     d.pci = o.pci;
+    d.usb = o.usb;
     d.memory_mb = o.memory_mb;
     return "// " + o.name +
            ", made with the OSEF editor.\n"

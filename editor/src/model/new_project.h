@@ -31,6 +31,7 @@ struct NewProjectOptions {
     bool serial = true;                    // osef::Hw::Serial
     bool clock = true;                     // osef::Hw::RTC
     bool pci = false;                      // osef::Hw::PCI
+    bool usb = false;                      // osef::Hw::USB
     unsigned memory_mb = 128;
     std::string look = "Classic";          // a look_presets() name
     bool sample_programs = true;           // add a few template programs to try

@@ -95,7 +95,7 @@ the engine today (bare-metal layer in `engine/src/baremetal/`).
 | `hw.display` | Display | Implemented, toggle ⛓ Hw::Framebuffer | Resolution ⛓ (Resolution, 0×0 = auto), Console (Info: font8x8 text console, ANSI colors) | `fbconsole.cpp` |
 | `hw.keyboard` | Keyboard | Implemented, toggle ⛓ Hw::PS2Keyboard | Interface (Info: PS/2, scancode set 1), IRQ (Info: 1), Ports (Info: 0x60 / 0x64), Layout (Enum US, read-only) | `keyboard.cpp` |
 | `hw.mouse` | Mouse | Planned | Interface (Info: PS/2 aux port, IRQ 12; USB HID later) | — |
-| `hw.usb` | USB | Planned | Host controller (Info: xHCI), Classes (Info: HID keyboard/mouse, mass storage) — needs PCI | — |
+| `hw.usb` | USB | Partial, toggle ⛓ Hw::USB | Host controller (Info: xHCI, polled event ring), Class drivers (Info: HID boot keyboard as console input), Try it (Info: lsusb), Planned (Info: hubs, HID mouse, mass storage, MSI-X, hot plug) | `usb.cpp`, `vmm.cpp` |
 | `hw.storage` | Storage | Planned | Controllers (Info: AHCI SATA, NVMe, ATA PIO) | — |
 | `hw.pci` | PCI | Implemented, toggle ⛓ Hw::PCI | Access (Info: legacy configuration mechanism #1, 0xCF8/0xCFC), Try it (Info: `lspci`) | `pci.cpp`, `shell.cpp`, `platform_baremetal.cpp` |
 | `hw.network` | Network | Planned | Adapters (Info: virtio-net, Intel e1000) | — |

@@ -24,7 +24,7 @@ constexpr const char* kBullet = "\xE2\x80\xA2";
 // Components whose properties or toggle are bound to the declaration; each
 // gets a "main.cpp (OSEF_HARDWARE)" source that follows the declaration.
 constexpr const char* kBoundComponents[] = {
-    "boot.firmware", "hw.memory", "hw.serial", "hw.display", "hw.keyboard", "hw.rtc", "hw.pci"};
+    "boot.firmware", "hw.memory", "hw.serial", "hw.display", "hw.keyboard", "hw.rtc", "hw.pci", "hw.usb"};
 
 // Truncates to at most `max` bytes without splitting a UTF-8 sequence.
 std::string utf8_truncate(std::string s, size_t max) {
@@ -499,6 +499,7 @@ struct Project::Impl {
         if (Component* c = root->find("hw.keyboard")) c->enabled = d.ps2_keyboard;
         if (Component* c = root->find("hw.rtc")) c->enabled = d.rtc;
         if (Component* c = root->find("hw.pci")) c->enabled = d.pci;
+        if (Component* c = root->find("hw.usb")) c->enabled = d.usb;
 
         // Declaration status + where it is.
         std::string status;
@@ -752,6 +753,7 @@ void Project::apply_enabled(Component& component) {
     else if (id == "hw.keyboard") d.ps2_keyboard = enabled;
     else if (id == "hw.rtc") d.rtc = enabled;
     else if (id == "hw.pci") d.pci = enabled;
+    else if (id == "hw.usb") d.usb = enabled;
     else return;
     m.write_decl(d);
     sync_from_code();

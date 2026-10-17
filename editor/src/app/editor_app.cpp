@@ -838,6 +838,8 @@ void EditorApp::draw_new_os_dialog() {
     ImGui::Checkbox("CMOS RTC", &new_os_clock_);
     ImGui::SameLine();
     ImGui::Checkbox("PCI", &new_os_pci_);
+    ImGui::SameLine();
+    ImGui::Checkbox("USB", &new_os_usb_);
     label("   Minimum RAM");
     static const char* const memory_labels[] = {"64 MiB", "128 MiB (default)", "256 MiB", "512 MiB"};
     ImGui::Combo("##new_mem", &new_os_memory_, memory_labels, 4);
@@ -865,6 +867,7 @@ void EditorApp::draw_new_os_dialog() {
     o.serial = new_os_serial_;
     o.clock = new_os_clock_;
     o.pci = new_os_pci_;
+    o.usb = new_os_usb_;
     o.memory_mb = kMemory[std::clamp(new_os_memory_, 0, 3)];
     o.look = looks[static_cast<size_t>(new_os_look_)].name;
     o.sample_programs = new_os_samples_;
