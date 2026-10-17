@@ -14,7 +14,8 @@
 #   <name>-check-source  `osef-image check-source main.cpp`: fails early, with a
 #                        readable message, when the OSEF_HARDWARE declaration is missing
 #   <name>-iso           the kernel ELF (from the bare-metal sub-build) and a bootable
-#                        ISO for the declared firmware: <build>/images/<name>.{elf,iso}
+#                        ISO for the declared firmware: <build>/images/<name>.{elf,iso},
+#                        exported to <dir>/<name>.iso too (OSEF_EXPORT_ISO, default ON)
 #   <name>-qemu          boot that ISO in QEMU (window = framebuffer console,
 #                        terminal = serial console; OVMF for UEFI OSes)
 # In the bare-metal sub-build (cmake/toolchains/x86_64-osef-baremetal.cmake) it
@@ -338,6 +339,9 @@ function(osef_add_os name)
             COMMAND "${CMAKE_COMMAND}" -E copy "${kernel}" "${elf}"
             COMMAND $<TARGET_FILE:osef-image> iso "${elf}" -o "${iso}"
                     --limine "${OSEF_LIMINE_DIR}" --xorriso "${OSEF_XORRISO}" ${limine_tool_args}
+            # Export a copy into the OS's own project folder (OSEF_EXPORT_ISO).
+            COMMAND "$<IF:$<BOOL:${OSEF_EXPORT_ISO}>,${CMAKE_COMMAND};-E;copy;${iso};${dir}/${name}.iso,${CMAKE_COMMAND};-E;true>"
+            COMMAND_EXPAND_LISTS
             DEPENDS "${kernel}" osef-image
             COMMENT "Building bootable ISO ${iso}"
             VERBATIM)

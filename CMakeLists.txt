@@ -67,6 +67,7 @@ set(OSEF_KERNEL_BUILD_TYPE Release CACHE STRING "CMAKE_BUILD_TYPE of the bare-me
 option(OSEF_BUILD_TESTS "Build the engine tests" ${PROJECT_IS_TOP_LEVEL})
 option(OSEF_TEST_ISO "Add the ISO boot test (tests/iso/boot_test.sh) to ctest" OFF)
 option(OSEF_BUILD_EDITOR "Build the OSEF editor (editor/)" OFF)
+option(OSEF_EXPORT_ISO "Also copy each ISO into its OS project folder" ON)
 # osef_configure_iso_pipeline() and osef_add_os() read the absolute path.
 set(OSEF_TOOLCHAIN_DIR "${OSEF_TOOLCHAIN_DIR_ABS}")
 

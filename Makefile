@@ -9,7 +9,8 @@
 # Bare metal (x86_64 kernel booted by Limine, packaged as a bootable ISO whose
 # boot path is exactly the firmware declared in OSEF_HARDWARE: BIOS or UEFI):
 #   make kernel                 link the selected OS into build/<os>.elf
-#   make iso                    build/<os>.iso for the selected OS (every example if none is selected)
+#   make iso                    <project>/<os>.iso (+ build/<os>.iso) for the selected OS
+#                               (every example if none is selected; EXPORT_ISO=0: build/ only)
 #   make run-iso                boot the selected OS's ISO in QEMU (window + serial on this terminal)
 #   make test-iso               boot every example ISO (and tests/iso/faultos) headless in QEMU and
 #                               check the serial output; also the ISO part of tests/build
@@ -134,6 +135,10 @@ BM_OS_ELF := $(BM_OS_DIR)/$(OS_NAME).elf
 BM_OS_ISO := $(BM_OS_DIR)/$(OS_NAME).iso
 OS_ELF    := $(BUILD)/$(OS_NAME).elf
 OS_ISO    := $(BUILD)/$(OS_NAME).iso
+# The finished ISO is also exported into the OS's own project folder
+# (EXPORT_ISO=0 turns that off). OS_ABS has no spaces (see the symlink above).
+EXPORT_ISO ?= 1
+PROJECT_ISO := $(OS_ABS)/$(OS_NAME).iso
 
 # ---------------------------------------------------------------- source fingerprint
 # GNU make 3.81 (macOS's /usr/bin/make) compares whole-second mtimes: an edit
@@ -231,7 +236,12 @@ endif
 iso-one: $(BM_OS_ISO)
 	@cmp -s $(BM_OS_ELF) $(OS_ELF) || cp $(BM_OS_ELF) $(OS_ELF)
 	@if cmp -s $(BM_OS_ISO) $(OS_ISO); then state="ISO up to date"; else cp $(BM_OS_ISO) $(OS_ISO) && state="ISO written"; fi; \
-	$(OSEF_IMAGE) inspect $(OS_ELF) | awk -F= -v iso="$(OS_ISO)" -v src="$(OS_SOURCE_DIR)" -v state="$$state" \
+	iso="$(OS_ISO)"; \
+	if [ "$(EXPORT_ISO)" = 1 ]; then \
+	    if ! cmp -s $(BM_OS_ISO) $(PROJECT_ISO); then cp $(BM_OS_ISO) $(PROJECT_ISO) && state="ISO written"; fi; \
+	    iso="$(OS_SOURCE_DIR)/$(OS_NAME).iso"; \
+	fi; \
+	$(OSEF_IMAGE) inspect $(OS_ELF) | awk -F= -v iso="$$iso" -v src="$(OS_SOURCE_DIR)" -v state="$$state" \
 	    '{ v[$$1] = $$2 } END { printf "%s: os=%s firmware=%s path=%s (source: %s)\n", state, v["name"], v["firmware"], iso, src }'
 
 # Boot the selected OS's ISO in QEMU with the firmware it declares. The QEMU
