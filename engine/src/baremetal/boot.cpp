@@ -104,7 +104,9 @@ void console_write(const char* s, size_t n) {
 
 void console_write(const char* s) { console_write(s, cstr_len(s)); }
 
-bool input_getc(char& c) { return keyboard_getc(c) || serial_getc(c); }
+bool input_getc(char& c) {
+    return keyboard_getc(c) || ((spec().devices & Hw::USB) && usb_getc(c)) || serial_getc(c);
+}
 
 const char* firmware_name() {
     limine_firmware_type_response* r = g_firmware_request.response;
@@ -260,6 +262,8 @@ void setup_heap(const HardwareSpec& hw) {
     if ((hw.devices & Hw::Serial) && serial_present()) serial_enable_rx_irq();
     if ((hw.devices & Hw::Serial) && !serial_present()) log("warning: Hw::Serial declared but COM1 did not respond");
     cpu::sti();
+    // USB needs the timer running (its controller timeouts use ticks_ms).
+    if (hw.devices & Hw::USB) usb_init();
 
     // 9. Firmware check.
     const char* booted = firmware_name();

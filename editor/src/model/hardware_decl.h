@@ -21,6 +21,7 @@ struct HardwareDecl {
     bool ps2_keyboard = false; // osef::Hw::PS2Keyboard
     bool rtc = false;          // osef::Hw::RTC
     bool pci = false;          // osef::Hw::PCI
+    bool usb = false;          // osef::Hw::USB
     uint32_t memory_mb = 128;
     uint32_t serial_baud = 115200;
     uint32_t fb_width = 0;     // 0 x 0 = firmware default

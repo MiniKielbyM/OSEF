@@ -48,6 +48,24 @@ void console_set_colors(int fg, int bg); // framebuffer default colors (ANSI 0-1
 bool input_getc(char& c);
 bool rtc_read(RtcTime& time);
 size_t pci_scan(PciInfo* devices, size_t capacity);
+
+// ---- USB (usb.cpp, xHCI) ----
+struct UsbInfo {
+    uint8_t port, slot, speed;  // speed: 1 full, 2 low, 3 high, 4+ super
+    uint16_t vendor, product;
+    uint8_t device_class, device_subclass, device_protocol;  // device, else first interface
+    bool keyboard;              // HID boot keyboard feeding console input
+    char manufacturer[32];
+    char name[48];
+};
+void usb_init();                // finds and starts the xHCI controller, enumerates devices
+void usb_poll();                // processes controller events (keyboard reports)
+bool usb_getc(char& c);         // next decoded character from USB keyboards
+size_t usb_list(UsbInfo* out, size_t capacity);
+// Config space access and lookup by class (independent of Hw::PCI; for drivers).
+uint32_t pci_read32(const PciInfo& device, uint8_t offset);
+void pci_write32(const PciInfo& device, uint8_t offset, uint32_t value);
+bool pci_find_class(uint8_t class_code, uint8_t subclass, uint8_t prog_if, PciInfo& out, size_t index = 0);
 void acpi_init();
 bool acpi_power_off();
 uint64_t hhdm_offset();

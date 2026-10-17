@@ -170,6 +170,7 @@ std::string devices_string(uint32_t d) {
     add(osef::Hw::PS2Keyboard, "ps2-keyboard");
     add(osef::Hw::RTC, "rtc");
     add(osef::Hw::PCI, "pci");
+    add(osef::Hw::USB, "usb");
     return out.empty() ? "none" : out;
 }
 
@@ -732,6 +733,10 @@ int cmd_run(const Args& a) {
             die("UEFI firmware (OVMF/edk2 code .fd) not found; pass --ovmf <path> (QEMU ships share/qemu/edk2-x86_64-code.fd)");
         cmd.insert(cmd.end(), {"-drive", "if=pflash,format=raw,readonly=on,file=" + a.ovmf});
     }
+    // Declared USB: give the VM an xHCI controller with a keyboard and a tablet.
+    if (spec.devices & osef::Hw::USB)
+        cmd.insert(cmd.end(), {"-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0", "-device",
+                               "usb-tablet,bus=xhci.0"});
     if (a.headless) cmd.insert(cmd.end(), {"-display", "none"});
     if (a.test) cmd.insert(cmd.end(), {"-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-no-reboot"});
     cmd.insert(cmd.end(), a.passthrough.begin(), a.passthrough.end());

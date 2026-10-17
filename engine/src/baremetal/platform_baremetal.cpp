@@ -101,6 +101,29 @@ public:
         return true;
     }
 
+    bool usb_devices(Vector<UsbDevice>& out) override {
+        if (!(bm::spec().devices & Hw::USB)) return false;
+        bm::UsbInfo found[16]{};
+        const size_t count = bm::usb_list(found, 16);
+        for (size_t i = 0; i < count && i < 16; ++i) {
+            const bm::UsbInfo& d = found[i];
+            UsbDevice u;
+            u.port = d.port;
+            u.slot = d.slot;
+            u.speed = d.speed;
+            u.vendor_id = d.vendor;
+            u.product_id = d.product;
+            u.device_class = d.device_class;
+            u.subclass = d.device_subclass;
+            u.protocol = d.device_protocol;
+            u.keyboard = d.keyboard;
+            u.manufacturer = d.manufacturer;
+            u.name = d.name;
+            out.push_back(osef::move(u));
+        }
+        return true;
+    }
+
     MemoryStats memory() const override {
         const bm::HeapStats hs = bm::heap_stats();
         MemoryStats m;

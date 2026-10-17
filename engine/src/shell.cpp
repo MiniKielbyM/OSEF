@@ -118,6 +118,34 @@ const Vector<Builtin>& builtins() {
                            static_cast<unsigned>(t.second));
              return 0;
          }},
+        {"lsusb", "list USB devices (bare metal; enable osef::Hw::USB)", [](Context& c, const Args&, String& out) {
+             Vector<UsbDevice> devices;
+             if (!c.kernel().platform().usb_devices(devices)) {
+                 out += "lsusb: USB unavailable (enable osef::Hw::USB on bare metal; QEMU: -device qemu-xhci)\n";
+                 return 1;
+             }
+             auto class_name = [](const UsbDevice& d) -> const char* {
+                 switch (d.device_class) {
+                 case 0x03: return d.protocol == 1 ? "HID keyboard" : d.protocol == 2 ? "HID mouse" : "HID";
+                 case 0x08: return "mass storage";
+                 case 0x09: return "hub";
+                 case 0x0E: return "video";
+                 case 0x01: return "audio";
+                 case 0x02: return "communications";
+                 case 0xE0: return "wireless";
+                 default: return "device";
+                 }
+             };
+             static const char* const speeds[] = {"?", "full-speed", "low-speed", "high-speed", "super-speed"};
+             for (const UsbDevice& d : devices)
+                 out += format("Port %u Slot %u: ID %04x:%04x %s%s%s  [%s, %s%s]\n", unsigned(d.port), unsigned(d.slot),
+                               unsigned(d.vendor_id), unsigned(d.product_id), d.manufacturer.c_str(),
+                               d.manufacturer.empty() ? "" : " ", d.name.empty() ? "(unnamed)" : d.name.c_str(),
+                               class_name(d), d.speed < 5 ? speeds[d.speed] : "super-speed+",
+                               d.keyboard ? ", console input" : "");
+             if (devices.empty()) out += "no USB devices found\n";
+             return 0;
+         }},
         {"irq", "list custom interrupt handlers", [](Context& c, const Args&, String& out) {
              const Vector<InterruptInfo> list = c.kernel().interrupts().list();
              if (list.empty()) {

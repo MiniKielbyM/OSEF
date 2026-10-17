@@ -43,6 +43,20 @@ struct PciDevice {
     uint8_t programming_interface = 0;
 };
 
+struct UsbDevice {
+    uint8_t port = 0;
+    uint8_t slot = 0;
+    uint8_t speed = 0;          // 1 full, 2 low, 3 high, 4+ super speed
+    uint16_t vendor_id = 0;
+    uint16_t product_id = 0;
+    uint8_t device_class = 0;   // USB class code (device, else first interface)
+    uint8_t subclass = 0;
+    uint8_t protocol = 0;
+    bool keyboard = false;      // HID boot keyboard used for console input
+    String manufacturer;
+    String name;
+};
+
 class Platform {
 public:
     virtual ~Platform() = default;
@@ -86,6 +100,7 @@ public:
     // on this platform or not enabled in the hardware declaration.
     virtual bool read_wall_clock(WallClock&) { return false; }
     virtual bool pci_devices(Vector<PciDevice>&) { return false; }
+    virtual bool usb_devices(Vector<UsbDevice>&) { return false; }
 
     // ---- Interrupts ----
     // Vectors 0-31 are CPU exceptions (reserved), 32-47 the legacy IRQ lines

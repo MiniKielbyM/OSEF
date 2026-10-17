@@ -62,7 +62,7 @@ std::string color_enum_name(std::string_view color) {
 
 const std::vector<std::string>& reserved_command_names() {
     static const std::vector<std::string> names = {
-        "help", "echo", "time", "irq", "int", "lspci", "ls",   "cat",   "cd",    "pwd",  "mkdir",  "touch",    "rm",
+        "help", "echo", "time", "irq", "int", "lsusb", "lspci", "ls",   "cat",   "cd",    "pwd",  "mkdir",  "touch",    "rm",
         "mounts", "ps", "kill", "send",  "services", "sys", "mods", "sched", "hw", "mem", "uptime", "uname",
         "clear", "exit", "shutdown", "sh",
     };

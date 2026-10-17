@@ -49,8 +49,9 @@ enum : uint32_t {
     PS2Keyboard = 1u << 2,  // PS/2 keyboard input
     RTC = 1u << 3,          // MC146818-compatible CMOS wall clock
     PCI = 1u << 4,          // PCI configuration-space enumeration
+    USB = 1u << 5,          // xHCI USB host controller: device enumeration, HID boot keyboards
 };
-constexpr uint32_t kAll = Serial | Framebuffer | PS2Keyboard | RTC | PCI;
+constexpr uint32_t kAll = Serial | Framebuffer | PS2Keyboard | RTC | PCI | USB;
 } // namespace Hw
 
 constexpr uint32_t kHardwareMagic = 0x4645534Fu; // "OSEF" (little endian)

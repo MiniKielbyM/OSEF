@@ -251,14 +251,20 @@ run-iso: iso-one need-qemu
 
 # Automated boot tests: every example ISO, headless, scripted serial input;
 # then FaultOS (tests/iso/faultos: CPU faults and stack overflow are isolated,
-# escape sequences, run --test exit codes) and the ISO build-system checks.
+# escape sequences, run --test exit codes), DevicesOS (tests/iso/devicesos: USB
+# enumeration + typing on a USB keyboard, custom interrupts) and the ISO
+# build-system checks.
 FAULT_OS := $(ROOT)/tests/iso/faultos
+DEVICES_OS := $(ROOT)/tests/iso/devicesos
 test-iso: need-qemu
 	@for os in $(EXAMPLES); do $(MAKE) --no-print-directory -f $(ROOT)/Makefile OS=$$os iso-one || exit 1; done
 	@$(MAKE) --no-print-directory -f $(ROOT)/Makefile OS_DIR=$(FAULT_OS) iso-one
 	@OSEF_IMAGE="$(OSEF_IMAGE)" QEMU="$(QEMU)" OVMF="$(OVMF)" XORRISO="$(XORRISO)" BUILD="$(BUILD)" \
 	    PYTHON="$(PYTHON)" bash $(ROOT)/tests/iso/boot_test.sh $(EXAMPLES)
 	@OSEF_IMAGE="$(OSEF_IMAGE)" QEMU="$(QEMU)" BUILD="$(BUILD)" PYTHON="$(PYTHON)" bash $(ROOT)/tests/iso/fault_test.sh
+	@$(MAKE) --no-print-directory -f $(ROOT)/Makefile OS_DIR=$(DEVICES_OS) EXPORT_ISO=0 iso-one
+	@echo "== devicesos (USB + custom interrupts)"
+	@$(PYTHON) $(ROOT)/tests/iso/devices_test.py "$(OSEF_IMAGE)" "$(QEMU)" "$(OVMF)" "$(BUILD)"
 	@MAKE="$(MAKE)" ROOT="$(ROOT)" OUT="$(BUILD)/tests/build-iso" bash $(ROOT)/tests/build/run.sh iso
 
 # OSEF_HARDWARE checks: missing declarations, missing firmware and bad devices

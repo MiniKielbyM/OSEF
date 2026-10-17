@@ -28,8 +28,8 @@ constexpr const char* kEmptyName = "OSEF_HARDWARE: .name() must not be empty";
 constexpr const char* kLongName = "OSEF_HARDWARE: .name() is too long (max 31 characters)";
 
 constexpr uint32_t kSerial = 1u << 0, kFramebuffer = 1u << 1, kPs2Keyboard = 1u << 2;
-constexpr uint32_t kRtc = 1u << 3, kPci = 1u << 4;
-constexpr uint32_t kAllDevices = kSerial | kFramebuffer | kPs2Keyboard | kRtc | kPci;
+constexpr uint32_t kRtc = 1u << 3, kPci = 1u << 4, kUsb = 1u << 5;
+constexpr uint32_t kAllDevices = kSerial | kFramebuffer | kPs2Keyboard | kRtc | kPci | kUsb;
 
 std::string_view newline_of(std::string_view source) {
     size_t lf = source.find('\n');
@@ -218,10 +218,11 @@ private:
             else if (flag == "PS2Keyboard") f = kPs2Keyboard;
             else if (flag == "RTC") f = kRtc;
             else if (flag == "PCI") f = kPci;
+            else if (flag == "USB") f = kUsb;
             else if (flag == "kAll") f = kAllDevices;
             else {
                 problem(term.a, "unknown device flag osef::Hw::" + flag +
-                                    " (known: Serial, Framebuffer, PS2Keyboard, RTC, PCI, kAll)");
+                                    " (known: Serial, Framebuffer, PS2Keyboard, RTC, PCI, USB, kAll)");
                 lossy = true;
                 f = 0;
             }
@@ -311,6 +312,7 @@ private:
                 d.ps2_keyboard = (f & kPs2Keyboard) != 0;
                 d.rtc = (f & kRtc) != 0;
                 d.pci = (f & kPci) != 0;
+                d.usb = (f & kUsb) != 0;
             } else {
                 bad_args(name_tok, "osef::Hw flags joined with |, e.g. osef::Hw::Serial | osef::Hw::Framebuffer");
             }
@@ -415,6 +417,7 @@ std::string generate_impl(const HardwareDecl& d, std::string_view nl) {
     add_device(d.ps2_keyboard, "osef::Hw::PS2Keyboard");
     add_device(d.rtc, "osef::Hw::RTC");
     add_device(d.pci, "osef::Hw::PCI");
+    add_device(d.usb, "osef::Hw::USB");
     if (!devices.empty()) line(".devices(" + devices + ")");
     line(".memory_mb(" + std::to_string(d.memory_mb) + ")");
     if (d.serial_baud != 115200) line(".serial_baud(" + std::to_string(d.serial_baud) + ")");
