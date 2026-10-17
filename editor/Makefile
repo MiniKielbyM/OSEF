@@ -124,7 +124,7 @@ ALL_OBJS := $(EDITOR_OBJS) $(EDITOR_NATIVE_OBJS) $(IMGUI_OBJS) $(GLFW_OBJS) $(TE
 
 # ---- Targets -------------------------------------------------------------------
 
-.PHONY: all run test deps clean
+.PHONY: all run test deps clean app install uninstall
 .DEFAULT_GOAL := all
 
 all: deps $(BIN)
@@ -153,6 +153,50 @@ $(TEST_BIN): $(TEST_OBJS)
 
 clean:
 	rm -rf $(BUILD)
+
+# ---- macOS app bundle -----------------------------------------------------------
+#   make -C editor app        build/editor/OSEF Editor.app (double-click it, or drag it to Applications)
+#   make -C editor install    copy it to /Applications (or ~/Applications if that isn't writable)
+#   make -C editor uninstall  remove the installed copy
+# The bundle keeps using this OSEF folder (compiled in) for the engine and the
+# example projects, so build it from where the OSEF checkout will stay.
+APP_VERSION ?= 0.1.0
+APP         := $(BUILD)/OSEF Editor.app
+APP_STAMP   := $(BUILD)/.app-stamp
+ICONSET     := $(BUILD)/OSEF.iconset
+ICNS        := $(BUILD)/OSEF.icns
+INSTALL_DIR ?= $(shell if [ -w /Applications ]; then echo /Applications; else echo "$$HOME/Applications"; fi)
+
+ifeq ($(UNAME_S),Darwin)
+$(ICNS): $(BIN)
+	@echo "  ICON  $@"
+	$(Q)rm -rf "$(ICONSET)" && $(BIN) --write-iconset "$(ICONSET)" && iconutil -c icns "$(ICONSET)" -o "$@"
+
+app: all $(ICNS) $(EDITOR_DIR)/macos/Info.plist.in
+	@echo "  APP   $(APP)"
+	$(Q)rm -rf "$(APP)"
+	$(Q)mkdir -p "$(APP)/Contents/MacOS" "$(APP)/Contents/Resources/fonts"
+	$(Q)cp "$(BIN)" "$(APP)/Contents/MacOS/osef-editor"
+	$(Q)cp "$(FONTS_DIR)"/*.ttf "$(FONTS_DIR)"/*.txt "$(APP)/Contents/Resources/fonts/"
+	$(Q)cp "$(ICNS)" "$(APP)/Contents/Resources/OSEF.icns"
+	$(Q)sed 's/@VERSION@/$(APP_VERSION)/g' "$(EDITOR_DIR)/macos/Info.plist.in" > "$(APP)/Contents/Info.plist"
+	$(Q)printf 'APPL????' > "$(APP)/Contents/PkgInfo"
+	$(Q)codesign --force --deep --sign - "$(APP)" 2>/dev/null || echo "  (codesign unavailable: the app is unsigned)"
+	@echo "Built $(APP)"
+	@echo "Install it with: make -C editor install   (or drag it into Applications in Finder)"
+
+install: app
+	@mkdir -p "$(INSTALL_DIR)"
+	@rm -rf "$(INSTALL_DIR)/OSEF Editor.app"
+	@ditto "$(APP)" "$(INSTALL_DIR)/OSEF Editor.app"
+	@echo "Installed $(INSTALL_DIR)/OSEF Editor.app (open it from Launchpad, Spotlight or Finder)"
+
+uninstall:
+	rm -rf "$(INSTALL_DIR)/OSEF Editor.app"
+else
+app install uninstall:
+	@echo "The app bundle is macOS only; on this system run $(BIN) directly."
+endif
 
 # Objects wait for the bootstrap (order-only: it never forces a rebuild).
 $(ALL_OBJS): | deps

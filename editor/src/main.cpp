@@ -202,6 +202,7 @@ fs::path executable_path(const char* argv0) {
 }
 
 // First of: $OSEF_EDITOR_FONTS_DIR, <exe dir>/fonts, <exe dir>/../share/osef-editor/fonts,
+// <exe dir>/../Resources/fonts (inside OSEF Editor.app),
 // the build-time third_party/fonts. Empty if none has the UI font.
 fs::path find_fonts_dir(const fs::path& exe) {
     std::vector<fs::path> candidates;
@@ -209,6 +210,7 @@ fs::path find_fonts_dir(const fs::path& exe) {
     if (!exe.empty()) {
         candidates.push_back(exe.parent_path() / "fonts");
         candidates.push_back(exe.parent_path().parent_path() / "share" / "osef-editor" / "fonts");
+        candidates.push_back(exe.parent_path().parent_path() / "Resources" / "fonts");  // macOS .app bundle
     }
     if (*OSEF_EDITOR_FONTS_DIR) candidates.emplace_back(OSEF_EDITOR_FONTS_DIR);
     for (const fs::path& dir : candidates) {
@@ -843,7 +845,45 @@ int run(const Options& opt, const fs::path& exe) {
 
 } // namespace
 
+// --write-iconset <dir>: writes the app icon as a macOS .iconset (PNG files)
+// for `iconutil -c icns`. Used by `make -C editor app`.
+int write_iconset(const fs::path& dir) {
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    for (int base : {16, 32, 128, 256, 512}) {
+        for (int scale : {1, 2}) {
+            const int size = base * scale;
+            const std::vector<unsigned char> rgba = osef::editor::render_icon(size);
+            const std::string name = "icon_" + std::to_string(base) + "x" + std::to_string(base) +
+                                     (scale == 2 ? "@2x" : "") + ".png";
+            std::string error;
+            if (!osef::editor::write_png(dir / name, size, size, rgba.data(), false, &error)) {
+                std::fprintf(stderr, "osef-editor: %s\n", error.c_str());
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 int main(int argc, char** argv) {
+    if (argc == 3 && std::string_view(argv[1]) == "--write-iconset") return write_iconset(argv[2]);
+#if defined(__APPLE__)
+    // Launched from Finder / the Dock, the app gets a minimal PATH; the build
+    // buttons run make, clang, xorriso and QEMU, which may live in Homebrew.
+    if (const char* path = std::getenv("PATH")) {
+        std::string p = path;
+        for (const char* dir : {"/opt/homebrew/bin", "/usr/local/bin"})
+            if (("" + p + ":").find(std::string(dir) + ":") == std::string::npos) p += std::string(":") + dir;
+        setenv("PATH", p.c_str(), 1);
+    }
+    // Old macOS versions pass a process serial number when launching an app.
+    std::vector<char*> args;
+    for (int i = 0; i < argc; ++i)
+        if (i == 0 || std::string_view(argv[i]).rfind("-psn_", 0) != 0) args.push_back(argv[i]);
+    argc = static_cast<int>(args.size());
+    argv = args.data();
+#endif
     Options opt;
     if (const int rc = parse_args(argc, argv, opt); rc != 0) return rc < 0 ? 0 : rc;
     return run(opt, executable_path(argc > 0 ? argv[0] : nullptr));

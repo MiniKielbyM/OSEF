@@ -36,6 +36,8 @@ make -C editor run                # opens examples/myos
 make -C editor run ARGS="path/to/myos"
 make -C editor test               # headless unit tests (model, text, services)
 make -C editor test SANITIZE=1    # the same, with ASan + UBSan
+make -C editor app                # macOS: build/editor/OSEF Editor.app
+make -C editor install            # macOS: copy it to /Applications (or ~/Applications)
 ```
 
 Linux needs the X11/Wayland development headers that GLFW requires, for example

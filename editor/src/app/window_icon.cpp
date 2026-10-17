@@ -4,7 +4,7 @@
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
-#include <array>
+#include <vector>
 #include <cmath>
 #include <cstdint>
 
@@ -15,23 +15,35 @@ extern "C" void osef_editor_set_macos_app_icon(const unsigned char* pixels, int 
 namespace osef::editor {
 namespace {
 
-constexpr int kIconSize = 64;
-using Pixels = std::array<unsigned char, kIconSize * kIconSize * 4>;
+constexpr int kIconSize = 64;  // design grid; render_icon() scales it to any size
+
+struct Pixels {
+    int size = kIconSize;
+    float scale = 1.0f;
+    std::vector<unsigned char> data;
+    explicit Pixels(int s) : size(s), scale(static_cast<float>(s) / kIconSize), data(static_cast<size_t>(s) * s * 4) {}
+};
 
 struct Color {
     unsigned char r, g, b, a;
 };
 
+// Coordinates are in device pixels.
 void set_pixel(Pixels& pixels, int x, int y, Color color) {
-    if (x < 0 || x >= kIconSize || y < 0 || y >= kIconSize) return;
-    const size_t i = static_cast<size_t>((y * kIconSize + x) * 4);
-    pixels[i] = color.r;
-    pixels[i + 1] = color.g;
-    pixels[i + 2] = color.b;
-    pixels[i + 3] = color.a;
+    if (x < 0 || x >= pixels.size || y < 0 || y >= pixels.size) return;
+    const size_t i = static_cast<size_t>((y * pixels.size + x) * 4);
+    pixels.data[i] = color.r;
+    pixels.data[i + 1] = color.g;
+    pixels.data[i + 2] = color.b;
+    pixels.data[i + 3] = color.a;
 }
 
-void rounded_rect(Pixels& pixels, int left, int top, int right, int bottom, float radius, Color color) {
+// rounded_rect() and line() take coordinates on the 64-unit design grid.
+void rounded_rect(Pixels& pixels, float l, float t, float r, float b, float rad, Color color) {
+    const float k = pixels.scale;
+    const int left = static_cast<int>(std::lround(l * k)), top = static_cast<int>(std::lround(t * k));
+    const int right = static_cast<int>(std::lround(r * k)), bottom = static_cast<int>(std::lround(b * k));
+    const float radius = rad * k;
     const float cx0 = left + radius;
     const float cx1 = right - radius;
     const float cy0 = top + radius;
@@ -45,7 +57,9 @@ void rounded_rect(Pixels& pixels, int left, int top, int right, int bottom, floa
     }
 }
 
-void line(Pixels& pixels, float x0, float y0, float x1, float y1, float thickness, Color color) {
+void line(Pixels& pixels, float ax, float ay, float bx, float by, float width, Color color) {
+    const float k = pixels.scale;
+    const float x0 = ax * k, y0 = ay * k, x1 = bx * k, y1 = by * k, thickness = width * k;
     const float dx = x1 - x0;
     const float dy = y1 - y0;
     const float length_sq = dx * dx + dy * dy;
@@ -66,14 +80,13 @@ void line(Pixels& pixels, float x0, float y0, float x1, float y1, float thicknes
     }
 }
 
-Pixels make_icon() {
-    Pixels pixels{};
+Pixels make_icon(int size) {
+    Pixels pixels(size);
     rounded_rect(pixels, 0, 0, kIconSize, kIconSize, 13.0f, {24, 34, 47, 255});
     rounded_rect(pixels, 9, 11, 55, 53, 7.0f, {44, 62, 80, 255});
     rounded_rect(pixels, 13, 15, 51, 49, 4.0f, {20, 29, 41, 255});
     rounded_rect(pixels, 13, 15, 51, 25, 4.0f, {55, 75, 94, 255});
-    for (int y = 21; y < 25; ++y)
-        for (int x = 13; x < 51; ++x) set_pixel(pixels, x, y, {55, 75, 94, 255});
+    rounded_rect(pixels, 13, 21, 51, 25, 0.0f, {55, 75, 94, 255});
     rounded_rect(pixels, 17, 18, 20, 21, 1.5f, {91, 207, 202, 255});
     rounded_rect(pixels, 22, 18, 25, 21, 1.5f, {115, 143, 168, 255});
     rounded_rect(pixels, 27, 18, 30, 21, 1.5f, {115, 143, 168, 255});
@@ -90,13 +103,15 @@ Pixels make_icon() {
 
 } // namespace
 
+std::vector<unsigned char> render_icon(int size) { return make_icon(size).data; }
+
 void set_window_icon(GLFWwindow* window) {
-    static const Pixels pixels = make_icon();
+    static const Pixels pixels = make_icon(256);
 #if defined(__APPLE__)
     (void)window;
-    osef_editor_set_macos_app_icon(pixels.data(), kIconSize, kIconSize);
+    osef_editor_set_macos_app_icon(pixels.data.data(), pixels.size, pixels.size);
 #else
-    GLFWimage image{kIconSize, kIconSize, const_cast<unsigned char*>(pixels.data())};
+    GLFWimage image{pixels.size, pixels.size, const_cast<unsigned char*>(pixels.data.data())};
     glfwSetWindowIcon(window, 1, &image);
 #endif
 }

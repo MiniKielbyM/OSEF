@@ -177,6 +177,18 @@ ISOs from the app you need the ISO tools as well. Steps for each system:
    make -C editor                     # -> build/editor/osef-editor
    build/editor/osef-editor           # opens examples/myos; File > New OS… (Cmd+N) for your own
    ```
+4. Optional: make it a regular Mac app you can open from Launchpad, Spotlight
+   or the Dock:
+   ```sh
+   make -C editor app                 # -> build/editor/OSEF Editor.app (drag it into Applications)
+   make -C editor install             # or copy it there: /Applications, else ~/Applications
+   make -C editor uninstall           # remove it again
+   ```
+   The bundle contains the app, its fonts and its icon, and it is ad-hoc
+   signed. It still uses this OSEF folder for the engine and the build tools, so
+   keep the folder where it is, or rebuild the app after moving it. Because the
+   app isn't notarized, a copy downloaded to another Mac needs right-click >
+   Open the first time.
 
 If you already have Homebrew, `brew install lld xorriso qemu` can replace most
 of step 2. `tools/bootstrap.sh` uses tools it finds on your PATH and builds only
