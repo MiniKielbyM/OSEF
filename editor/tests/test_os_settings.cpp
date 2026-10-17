@@ -183,3 +183,27 @@ TEST(settings_files_written_only_when_changed) {
     CHECK(!load_settings(dir / "missing.ini", back, &error));
     CHECK(!error.empty());
 }
+
+TEST(settings_interrupts) {
+    OsSettings s;
+    s.programs = {{"message", "hello", "", "hi", 0}};
+    s.interrupts = {{"vector", 0x80, "my-call", "message", "got 0x80"},
+                    {"irq", 12, "mouse", "program", "hello"},
+                    {"vector", 20, "bad", "message", ""},
+                    {"irq", 3, "", "program", "missing"},
+                    {"vector", 0x80, "dup", "message", "x"}};
+    const auto problems = validate_settings(s);
+    CHECK(has_problem(problems, "Interrupt 'bad': OS vectors are 48-255"));
+    CHECK(has_problem(problems, "program 'missing' does not exist"));
+    CHECK(has_problem(problems, "Two interrupt handlers use the same vector 128"));
+    CHECK(parse_settings(serialize_settings(s)) == s);
+
+    const std::string code = generate_settings_code(s);
+    CHECK(code.find("kernel.interrupts().on_vector(0x80, \"my-call\"") != std::string::npos);
+    CHECK(code.find("k.print(\"got 0x80\\n\");") != std::string::npos);
+    CHECK(code.find("kernel.interrupts().on_irq(12, \"mouse\"") != std::string::npos);
+    CHECK(code.find("k.exec(\"hello\");") != std::string::npos);
+    CHECK(code.find("on_vector(0x14") == std::string::npos);  // invalid: skipped
+    CHECK(code.find("missing") == std::string::npos);
+    CHECK(code.find("\"dup\"") == std::string::npos);         // duplicate vector: first one wins
+}

@@ -98,6 +98,29 @@ std::vector<std::string> validate_settings(const OsSettings& s) {
     } else if (!s.shell) {
         problems.push_back("The shell is turned off, so choose another program to start at boot.");
     }
+    for (const InterruptSpec& i : s.interrupts) {
+        const std::string shown = "Interrupt '" + (i.name.empty() ? std::string("(unnamed)") : i.name) + "'";
+        if (i.source == "vector") {
+            if (i.number < 48 || i.number > 255)
+                problems.push_back(shown + ": OS vectors are 48-255 (0x30-0xFF); 0-31 are CPU exceptions, 32-47 IRQ lines.");
+        } else if (i.source == "irq") {
+            if (i.number < 0 || i.number > 15) problems.push_back(shown + ": IRQ lines are 0-15.");
+        } else {
+            problems.push_back(shown + ": source must be 'vector' or 'irq'.");
+        }
+        if (i.action == "program") {
+            const bool exists = i.text == "sh" || std::any_of(s.programs.begin(), s.programs.end(),
+                                                               [&](const ProgramSpec& p) { return p.name == i.text; });
+            if (!exists) problems.push_back(shown + ": program '" + i.text + "' does not exist.");
+        } else if (i.action != "message") {
+            problems.push_back(shown + ": action must be 'message' or 'program'.");
+        }
+    }
+    for (int a = 0; a < static_cast<int>(s.interrupts.size()); ++a)
+        for (int b = a + 1; b < static_cast<int>(s.interrupts.size()); ++b)
+            if (s.interrupts[a].source == s.interrupts[b].source && s.interrupts[a].number == s.interrupts[b].number)
+                problems.push_back("Two interrupt handlers use the same " + s.interrupts[a].source + " " +
+                                   std::to_string(s.interrupts[a].number) + ".");
     for (const FileSpec& f : s.files)
         if (f.path.size() < 2 || f.path[0] != '/' || f.path.back() == '/')
             problems.push_back("File '" + f.path + "': the path must start with / and name a file, like /home/notes.txt.");
@@ -199,6 +222,14 @@ std::string serialize_settings(const OsSettings& s) {
         kv(out, "text", p.text);
         kv(out, "number", std::to_string(p.number));
     }
+    for (const InterruptSpec& i : s.interrupts) {
+        out += "\n[interrupt]\n";
+        kv(out, "source", i.source);
+        kv(out, "number", std::to_string(i.number));
+        kv(out, "name", i.name);
+        kv(out, "action", i.action);
+        kv(out, "text", i.text);
+    }
     for (const FileSpec& f : s.files) {
         out += "\n[file]\n";
         kv(out, "path", f.path);
@@ -224,6 +255,7 @@ OsSettings parse_settings(std::string_view text, std::vector<std::string>* warni
             section = line.substr(1, line.size() - 2);
             if (section == "program") s.programs.emplace_back();
             else if (section == "file") s.files.emplace_back();
+            else if (section == "interrupt") s.interrupts.emplace_back();
             else if (section != "appearance" && section != "features") warn("unknown section [" + section + "]");
             continue;
         }
@@ -255,6 +287,14 @@ OsSettings parse_settings(std::string_view text, std::vector<std::string>* warni
             else if (key == "description") p.description = value;
             else if (key == "text") p.text = value;
             else if (key == "number") p.number = parse_int(value, p.number);
+            else known = false;
+        } else if (section == "interrupt") {
+            InterruptSpec& i = s.interrupts.back();
+            if (key == "source") i.source = value;
+            else if (key == "number") i.number = parse_int(value, i.number);
+            else if (key == "name") i.name = value;
+            else if (key == "action") i.action = value;
+            else if (key == "text") i.text = value;
             else known = false;
         } else if (section == "file") {
             FileSpec& f = s.files.back();
@@ -499,6 +539,26 @@ std::string generate_settings_code(const OsSettings& s) {
     for (const ProgramSpec* p : programs)
         o << "        kernel.programs().add<" << class_name(p->name) << ">(" << literal(p->name) << ", "
           << literal(p->description.empty() ? (find_program_template(p->kind)->label) : p->description) << ");\n";
+    std::set<std::pair<std::string, int>> seen_irq;
+    for (const InterruptSpec& i : s.interrupts) {
+        const bool vector = i.source == "vector";
+        if (!(vector ? (i.number >= 48 && i.number <= 255) : (i.source == "irq" && i.number >= 0 && i.number <= 15)))
+            continue;
+        if (!seen_irq.insert({i.source, i.number}).second) continue;
+        if (i.action == "program" && i.text != "sh" && !names.count(i.text)) continue;
+        if (i.action != "program" && i.action != "message") continue;
+        char num[16];
+        std::snprintf(num, sizeof num, vector ? "0x%02x" : "%d", i.number);
+        o << "        kernel.interrupts()." << (vector ? "on_vector(" : "on_irq(") << num << ", "
+          << literal(i.name.empty() ? (vector ? std::string("vector ") + num : std::string("irq ") + num) : i.name)
+          << ", [](osef::Kernel& k, uint8_t, uint32_t) {\n";
+        if (i.action == "program")
+            o << "            k.exec(" << literal(i.text) << ");\n";
+        else
+            o << "            k.print(" << literal(i.text.empty() || i.text.back() == '\n' ? i.text : i.text + "\n")
+              << ");\n";
+        o << "        });\n";
+    }
     o << "    }\n";
     if (!s.files.empty())
         o << "\nprivate:\n"

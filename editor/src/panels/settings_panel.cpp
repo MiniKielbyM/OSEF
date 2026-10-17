@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -463,6 +464,92 @@ bool programs_section(EditorContext& ctx, SettingsPanel::State& st, OsSettings& 
     return changed;
 }
 
+bool interrupts_section(EditorContext& ctx, OsSettings& s) {
+    if (!section(ctx, "Interrupts",
+                 "kernel.interrupts(): deferred handlers for IRQ lines 0-15 (vector 32+n) and OS vectors "
+                 "0x30-0xFF. Vectors 0-31 are CPU exceptions. Test soft vectors with the `int <vector>` command."))
+        return false;
+    bool changed = false;
+    int remove = -1;
+    for (size_t i = 0; i < s.interrupts.size(); ++i) {
+        InterruptSpec& it = s.interrupts[i];
+        ImGui::PushID(static_cast<int>(i) + 1000);
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, theme::color(Color::PanelBg));
+        ImGui::BeginChild("##irqcard", ImVec2(0, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+        const bool irq = it.source == "irq";
+        if (ctx.fonts.ui_bold) ImGui::PushFont(ctx.fonts.ui_bold, 0.0f);
+        if (irq) ImGui::Text("IRQ %d  (vector 0x%02X)", it.number, 32 + it.number);
+        else ImGui::Text("Vector 0x%02X", it.number);
+        if (ctx.fonts.ui_bold) ImGui::PopFont();
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60.0f);
+        if (ImGui::SmallButton("Remove")) remove = static_cast<int>(i);
+
+        row("Source", "Software/OS vector (raised with `int` or by a device you program) or a legacy PIC IRQ line.");
+        int source = irq ? 1 : 0;
+        static const char* const sources[] = {"OS vector (0x30-0xFF)", "IRQ line (0-15)"};
+        if (ImGui::Combo("##src", &source, sources, 2)) {
+            it.source = source ? "irq" : "vector";
+            it.number = source ? 12 : 0x80;
+            changed = true;
+        }
+        row(irq ? "IRQ number" : "Vector", irq ? "0-15. The engine uses 0 (PIT), 1 (PS/2 keyboard) and 4 (COM1); "
+                                                 "hooking them adds a handler, it does not replace the driver."
+                                            : "48-255 (0x30-0xFF).");
+        if (ImGui::InputInt("##num", &it.number, 1, 16, irq ? ImGuiInputTextFlags_None : ImGuiInputTextFlags_CharsHexadecimal)) {
+            it.number = irq ? std::clamp(it.number, 0, 15) : std::clamp(it.number, 48, 255);
+            changed = true;
+        }
+        row("Name", "Label listed by the `irq` command.");
+        changed |= ImGui::InputText("##iname", &it.name);
+        row("Action", "What the handler does (in kernel context, on the next scheduler pass).");
+        int action = it.action == "program" ? 1 : 0;
+        static const char* const actions[] = {"Print a message", "Start a program"};
+        if (ImGui::Combo("##act", &action, actions, 2)) {
+            it.action = action ? "program" : "message";
+            it.text = action ? (s.programs.empty() ? "sh" : s.programs.front().name) : "";
+            changed = true;
+        }
+        if (it.action == "program") {
+            row("Program");
+            if (ImGui::BeginCombo("##prog", it.text.c_str())) {
+                if (ImGui::Selectable("sh", it.text == "sh")) {
+                    it.text = "sh";
+                    changed = true;
+                }
+                for (const ProgramSpec& p : s.programs)
+                    if (ImGui::Selectable(p.name.c_str(), it.text == p.name)) {
+                        it.text = p.name;
+                        changed = true;
+                    }
+                ImGui::EndCombo();
+            }
+        } else {
+            row("Message");
+            changed |= ImGui::InputText("##imsg", &it.text);
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+        ImGui::PopID();
+    }
+    if (remove >= 0) {
+        s.interrupts.erase(s.interrupts.begin() + remove);
+        changed = true;
+    }
+    ImGui::Spacing();
+    if (ImGui::Button("Add interrupt handler")) {
+        int v = 0x80;
+        while (std::any_of(s.interrupts.begin(), s.interrupts.end(),
+                           [&](const InterruptSpec& x) { return x.source == "vector" && x.number == v; }) && v < 255)
+            ++v;
+        char name[32];
+        std::snprintf(name, sizeof name, "vector-%02x", v);
+        s.interrupts.push_back({"vector", v, name, "message", "interrupt received"});
+        changed = true;
+    }
+    return changed;
+}
+
 bool files_section(EditorContext& ctx, OsSettings& s) {
     if (!section(ctx, "Initial filesystem", "Files written to the root RamFS at boot (volatile; no persistent storage yet)."))
         return false;
@@ -570,6 +657,7 @@ void SettingsPanel::draw(EditorContext& ctx) {
     changed |= look_section(ctx, s);
     hardware_section(ctx);
     changed |= programs_section(ctx, *state_, s);
+    changed |= interrupts_section(ctx, s);
     changed |= files_section(ctx, s);
     ImGui::Spacing();
     if (changed) project.settings_changed();

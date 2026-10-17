@@ -37,6 +37,17 @@ struct FileSpec {
     bool operator==(const FileSpec&) const = default;
 };
 
+// A custom interrupt handler (kernel.interrupts().on_vector / on_irq).
+struct InterruptSpec {
+    std::string source = "vector";  // "vector": OS vector 48-255; "irq": IRQ line 0-15
+    int number = 0x80;
+    std::string name;               // label shown by the `irq` command
+    std::string action = "message"; // "message": print `text`; "program": start program `text`
+    std::string text;
+
+    bool operator==(const InterruptSpec&) const = default;
+};
+
 struct OsSettings {
     // ---- Appearance ----
     std::string welcome;                         // shown when the shell starts
@@ -53,6 +64,7 @@ struct OsSettings {
 
     std::vector<ProgramSpec> programs;
     std::vector<FileSpec> files;
+    std::vector<InterruptSpec> interrupts;
 
     bool operator==(const OsSettings&) const = default;
 };
